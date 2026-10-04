@@ -90,7 +90,8 @@ async function stub(page, opts = {}) {
     const cont = await page.evaluate(() => ({ p: !audio.paused, t: audio.currentTime, pos: round.pos, lim: ctx.limit, en: document.querySelector("#play").disabled }));
     ok(cont.p && cont.t > 2, "Play then carries on into the new part " + JSON.stringify(cont));
     await page.evaluate(() => stop());
-    ok((await page.textContent(".left")).includes("2 guesses"), "Skip uses a try");
+    ok((await page.textContent(".sg-guess")).includes("· 2 left"), "Skip uses a try");
+    ok(await page.evaluate(() => { const c = [...document.querySelectorAll(".sg-clips span")].map(x => x.className), n = round.guesses.length; return c.slice(0, n).every(x => x === "on") && c[n] === "cur" && c.slice(n + 1).every(x => x === ""); }), "Clip chips: past filled, current outlined, rest locked");
     ok((await page.textContent(".sg-row")).includes("Skipped"), "Skipped row shown");
     // Wrong guess: pick a song by a different artist
     const wrong = await page.evaluate(k => songSource().find(x => x.k !== k && mainArtist(x.a) !== mainArtist(round.target.a) && x.y && x.y !== round.target.y), t.k);
@@ -111,13 +112,22 @@ async function stub(page, opts = {}) {
     ok((await page.getAttribute(".win","class"))==="win", "Win screen shows");
     await page.waitForTimeout(500);
     ok(await page.evaluate(() => audio && !audio.paused), "Full preview autoplays after a win");
-    ok((await page.textContent(".chips")).includes("Streak 1"), "Streak counts the win");
+    ok((await page.textContent(".sg-mini")).includes("Streak 1") && (await page.textContent(".sg-stats b.ac")) === "1", "Streak counts the win");
     ok(await page.$eval("#lk-am", a => a.href.startsWith("https://audio.test") || a.href.includes("music.apple.com")) && await page.isVisible('.sg-links a[href^="https://open.spotify.com/search/"]') && await page.isVisible('.sg-links a[href^="https://music.youtube.com/search?q="]'), "Win card links to Apple Music, Spotify and YouTube Music");
     await page.click("#next");
     await page.waitForSelector("#play:not([disabled])");
     ok((await page.textContent(".prev")).includes(t.t), "Next song deals a new round");
     await page.click("#giveup");
-    ok((await page.getAttribute(".win","class")).includes("lose") && (await page.textContent(".chips")).includes("Streak 0") && (await page.textContent(".chips")).includes("Best 1"), "Give up shows answer and resets streak");
+    ok((await page.getAttribute(".win","class")).includes("lose") && (await page.textContent(".sg-mini")).includes("Streak 0") && (await page.textContent(".sg-mini")).includes("Best 1"), "Give up shows answer and resets streak");
+    // ---------- Record player look ----------
+    ok(await page.evaluate(() => document.documentElement.dataset.sgtheme === "emerald" && getComputedStyle(document.body).backgroundColor === "rgb(7, 9, 8)"), "Emerald is the default look");
+    ok(await page.evaluate(() => [...document.querySelectorAll(".sg-clips span")].every(x => x.className === "on") && getComputedStyle(document.querySelector(".sg-rec")).getPropertyValue("--open").trim() === "100%"), "After the round every clip chip is filled and the ring shows the full preview");
+    ok(await page.evaluate(() => document.querySelector(".sg-label").contains(document.elementFromPoint(...(r => [r.x + r.width / 2, r.y + r.height / 2])(document.querySelector(".sg-label").getBoundingClientRect())).closest(".sg-rec").querySelector(".sg-label")) && !!document.querySelector(".sg-rec #play")), "Play button sits on the record label");
+    await page.click("#gear"); await page.click('#themeseg [data-theme="sage"]');
+    ok(await page.evaluate(() => document.documentElement.dataset.sgtheme === "sage" && JSON.parse(localStorage.sd_cfg).theme === "sage" && getComputedStyle(document.body).backgroundColor === "rgb(223, 230, 216)"), "Sage look applies and is saved");
+    await page.click('#spinseg [data-spin="still"]');
+    ok(await page.evaluate(() => document.documentElement.dataset.sgspin === "still"), "Record spin setting applies");
+    await page.click('#themeseg [data-theme="emerald"]'); await page.click("#set-ok");
     // Volume remembered
     await page.$eval("#vol", e => { e.value = 35; e.dispatchEvent(new Event("input")) });
     // Era filter
@@ -212,7 +222,7 @@ async function stub(page, opts = {}) {
     await p6.click("#set-ok"); await p6.waitForSelector("#play:not([disabled])");
     ok(await p6.evaluate(() => ctx.limit === 2), "Game starts with a 2s clip");
     await p6.click("#skip");
-    ok(await p6.evaluate(() => ctx.limit === 8) && (await p6.textContent("#skip")).includes("+15s"), "Skip moves to 8s, next 15s");
+    ok(await p6.evaluate(() => ctx.limit === 8) && (await p6.textContent("#skip")).includes("+7s"), "Skip moves to 8s, next adds 7s");
     // "Start again" setting: skip while playing stops, next clip starts from 0
     await p6.click("#gear"); await p6.click('#flowseg [data-flow="false"]'); await p6.click("#set-ok");
     await p6.waitForSelector("#play:not([disabled])"); await p6.click("#play"); await p6.waitForTimeout(300);

@@ -3,134 +3,196 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#14213d">
+<meta name="theme-color" content="#070908">
 <title>Songdle</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎵</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=JetBrains+Mono:wght@500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@500;700&family=DM+Serif+Display:ital@0;1&family=JetBrains+Mono:wght@500&display=swap">
 <style>
-/* Same look as Songdle in Yahyadle, a little larger for easier reading */
-:root{--bg:#0a0f0c;--panel:#111a14;--panel2:#1a271e;--line:#2a3e30;--fg:#f1f6f2;--muted:#b3cbb9;
- --hit:#24804a;--near:#a8750c;--miss:#a3364a;--accent:#1ed760;--on-accent:#06240f;
- --display:"Bungee",Impact,system-ui,sans-serif;--body:"Bricolage Grotesque",system-ui,sans-serif;--mono:"JetBrains Mono",ui-monospace,monospace;
- --deco:repeating-radial-gradient(circle at 50% 120%,transparent 0 18px,rgba(30,215,96,.05) 18px 20px);color-scheme:dark}
+/* Green record player, same as Songdle in Yahyadle (Settings > Look: Emerald, Forest or Sage), a little larger for easier reading */
+:root{--bg:#070908;--fg:#eef3ee;--muted:#a3aea6;--line:#1f2622;--panel:#0d110f;--panel2:#131a16;--accent:#2fbf71;--on-accent:#06140c;--g1:#040504;--g2:#131714;
+ --hit:#24804a;--near:#8a5f0a;--miss:#8f2c3c;
+ --display:"DM Serif Display",Georgia,serif;--body:"DM Sans",system-ui,sans-serif;--mono:"JetBrains Mono",ui-monospace,monospace;color-scheme:dark}
+html[data-sgtheme="forest"]{--accent:#a9c9a4;--on-accent:#0b130f;--bg:#0b130f;--fg:#e7eee3;--muted:#9db39a;--line:#23332a;--panel:#101a14;--panel2:#16231b;--g1:#050a07;--g2:#142019}
+html[data-sgtheme="sage"]{--accent:#1f4d36;--on-accent:#eef2ea;--bg:#dfe6d8;--fg:#13241a;--muted:#3e5446;--line:#b9c6b0;--panel:#eef2ea;--panel2:#e7ece2;--g1:#0b0f0c;--g2:#1b221d;color-scheme:light}
 *{box-sizing:border-box}
-body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:17px;margin:0}
-body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background-image:var(--deco)}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-weight:500;font-size:17px;margin:0}
 button,input,select{font:inherit;color:inherit}
 :focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
-.wrap{max-width:860px;margin:0 auto;padding:14px max(14px,env(safe-area-inset-right)) 48px max(14px,env(safe-area-inset-left))}
+.wrap{max-width:1120px;margin:0 auto;padding:14px max(16px,env(safe-area-inset-right)) 48px max(16px,env(safe-area-inset-left))}
 .top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px}
 .tabs{display:flex;gap:6px;flex-wrap:wrap;flex:1}
-.tab{background:transparent;border:1px solid var(--line);color:var(--fg);padding:10px 18px;border-radius:999px;font:600 16px var(--body);cursor:pointer;min-height:46px}
+.tab{background:transparent;border:1px solid var(--line);color:var(--fg);padding:10px 18px;border-radius:999px;font:700 16px var(--body);cursor:pointer;min-height:46px}
 .tab:hover{border-color:var(--accent)}
 .tab[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
-.gearbtn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-width:46px;min-height:46px;padding:8px 14px;border-radius:999px;border:1px solid var(--line);background:var(--panel2);color:var(--fg);font:600 15px var(--body);cursor:pointer}
+.gearbtn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-width:46px;min-height:46px;padding:8px 14px;border-radius:999px;border:1px solid var(--line);background:var(--panel2);color:var(--fg);font:700 15px var(--body);cursor:pointer}
 .gearbtn:hover{border-color:var(--accent)}
-.stage{background:color-mix(in srgb,var(--panel) 92%,transparent);border:1px solid var(--line);border-radius:14px;padding:18px}
-.logo{text-align:center;font-family:var(--display);font-size:clamp(40px,9vw,64px);line-height:1;letter-spacing:.03em;text-transform:uppercase;text-shadow:0 0 18px rgba(30,215,96,.45);margin:2px 0 14px;font-weight:400}
+.stage{padding:18px 0 0}
+/* Header: italic serif logo, thin line underneath; on phones the stats sit next to it */
+.sg-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px 16px;flex-wrap:wrap;padding-bottom:16px;margin-bottom:24px;border-bottom:1px solid var(--line)}
+.logo{margin:0;font:italic 400 44px/1 var(--display);color:var(--fg)}
 .logo span{color:var(--accent)}
-.chips{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin:-4px 0 14px}
-.chip{display:inline-flex;align-items:center;gap:6px;background:var(--accent);color:var(--on-accent);border-radius:999px;padding:7px 14px;font:700 15px var(--body)}
-.chip.ghost{background:var(--panel2);color:var(--fg);border:1px solid var(--line)}
-.chip svg{width:16px;height:16px}
-.dbar{display:flex;justify-content:center;align-items:center;gap:8px;flex-wrap:wrap;margin:-4px 0 14px;font:600 15px var(--body);color:var(--muted)}
-.dbar .dtag{background:var(--accent);color:var(--on-accent);border-radius:999px;padding:3px 10px;font:800 12px var(--body);letter-spacing:.06em;text-transform:uppercase}
-.sg-filters{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;margin-bottom:14px}
-.sg-filters label{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:15px;font-weight:600}
-select,.lt input{background:var(--panel2);color:var(--fg);border:1px solid var(--line);border-radius:9px;padding:10px 12px;font:600 16px var(--body);min-height:46px}
-.sg-player{display:flex;flex-direction:column;align-items:center;gap:12px;margin-bottom:14px}
-.sg-controls{display:flex;align-items:center;justify-content:center;gap:18px;width:100%}
-.sg-side{min-width:120px;min-height:58px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:10px 14px}
-span.sg-side{visibility:hidden}
-.sg-side small{font:600 12px var(--mono);color:var(--muted)}
-.sg-play{position:relative;width:88px;height:88px;flex:none;border-radius:50%;border:0;background:var(--accent);color:var(--on-accent);cursor:pointer;display:grid;place-items:center;box-shadow:0 0 0 6px color-mix(in srgb,var(--accent) 22%,transparent)}
-.sg-play:disabled{opacity:.45;cursor:default}
-.sg-play svg{width:38px;height:38px;margin-left:4px}
-/* The pulse fades a ring in and out (opacity only, so phones don't repaint the button every frame) */
-.sg-play::after{content:"";position:absolute;inset:-14px;border-radius:50%;border:8px solid color-mix(in srgb,var(--accent) 10%,transparent);opacity:0;pointer-events:none}
-.sg-play.playing::after{animation:pulse 1s ease-in-out infinite}
-.sg-play .i-pause{display:none;margin-left:0}.sg-play.playing .i-pause{display:block}.sg-play.playing .i-play{display:none}
-@keyframes pulse{50%{opacity:1}}
+.sg-mini{font-size:14px;font-weight:700;color:var(--muted)}
+.sg-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:24px 48px;align-items:start}
+.sg-left{display:flex;flex-direction:column;align-items:center;gap:18px;min-width:0}
+.sg-right{display:flex;flex-direction:column;gap:22px;min-width:0}
+/* The record: ring = unlocked part of the clip (lighter where it has played), label holds the play button */
+.sg-rec{position:relative;width:min(460px,100%);aspect-ratio:1;display:grid;place-items:center;--open:0%;--pos:0%}
+.sg-ring{position:absolute;inset:0;border-radius:50%;background:conic-gradient(color-mix(in srgb,var(--accent) 55%,#fff) 0 var(--pos),var(--accent) 0 var(--open),var(--line) 0 100%)}
+.sg-disc{position:absolute;inset:1.7%;border-radius:50%;display:grid;place-items:center}
+.sg-grooves{position:absolute;inset:0;border-radius:50%;background:repeating-radial-gradient(circle,var(--g1) 0 1px,var(--g2) 1px 3px);box-shadow:0 30px 60px rgba(0,0,0,.45)}
+.sg-glint{position:absolute;inset:0;border-radius:50%;background:conic-gradient(from 10deg,rgba(255,255,255,0) 0deg,rgba(255,255,255,.05) 8deg,rgba(255,255,255,0) 16deg)}
+.sg-label{position:absolute;width:39%;aspect-ratio:1;border-radius:50%;background:var(--accent);color:var(--on-accent)}
+.sg-label b,.sg-label em{position:absolute;left:0;right:0;text-align:center;white-space:nowrap}
+.sg-label b{top:15%;font:700 11px var(--body);letter-spacing:.3em;padding-left:.3em}
+.sg-label em{bottom:15%;font:italic 400 13px var(--display)}
+.sg-sheen{position:absolute;inset:1.7%;border-radius:50%;pointer-events:none;background:conic-gradient(from 200deg,rgba(255,255,255,0) 0deg,rgba(255,255,255,.13) 30deg,rgba(255,255,255,0) 70deg,rgba(255,255,255,0) 180deg,rgba(255,255,255,.09) 215deg,rgba(255,255,255,0) 250deg)}
+.sg-play{position:relative;z-index:1;width:84px;height:84px;border-radius:50%;border:0;background:var(--g1);color:var(--accent);box-shadow:0 0 0 4px var(--accent);cursor:pointer;display:grid;place-items:center}
+.sg-play:disabled{opacity:.55;cursor:default}
+.sg-play svg{width:34px;height:34px}.sg-play .i-play{margin-left:3px}
+.sg-play .i-pause{display:none}.sg-play.playing .i-pause{display:block}.sg-play.playing .i-play{display:none}
+.sg-play:focus-visible{outline:3px solid var(--fg);outline-offset:6px}
+@keyframes sg-spin{to{transform:rotate(360deg)}}
+html[data-sgspin="always"] .sg-disc,html[data-sgspin="playing"] .sg-rec:has(.sg-play.playing) .sg-disc{animation:sg-spin 1.8s linear infinite}
+@media (prefers-reduced-motion:reduce){.sg-disc{animation-duration:6s!important}}
+/* Clip lengths: past = filled, current = outlined, locked = muted */
+.sg-clips{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;font:700 15px var(--body)}
+.sg-clips span{padding:8px 14px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
+.sg-clips .on{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.sg-clips .cur{border:2px solid var(--accent);color:var(--fg);padding:7px 13px}
+/* Scrubber: drag or tap to move within the unlocked part */
+.sg-scrub{position:relative;width:min(460px,100%);padding:12px 0 30px;cursor:pointer;touch-action:none;user-select:none;-webkit-user-select:none;--open:0%;--pos:0%}
+.sg-scrub:focus-visible{outline:2px solid var(--accent);outline-offset:4px;border-radius:8px}
+.sg-track{position:relative;height:8px;border-radius:999px;background:var(--line)}
+.sg-open{position:absolute;left:0;top:0;bottom:0;width:var(--open);min-width:6px;border-radius:999px;background:color-mix(in srgb,var(--accent) 45%,transparent)}
+.sg-fill{position:absolute;left:0;top:0;bottom:0;width:var(--pos);border-radius:999px;background:var(--accent)}
+.sg-track i{position:absolute;top:-2px;bottom:-2px;width:2px;margin-left:-1px;background:var(--bg)}
+.sg-knob{position:absolute;top:50%;left:var(--pos);width:20px;height:20px;margin:-10px 0 0 -10px;border-radius:50%;background:var(--fg);box-shadow:0 1px 4px rgba(0,0,0,.5);transition:transform .12s}
+.sg-scrub:hover .sg-knob,.sg-scrub:active .sg-knob{transform:scale(1.15)}
+.sg-tip{position:absolute;top:28px;left:clamp(18px,var(--pos),calc(100% - 18px));transform:translateX(-50%);font:700 13px var(--mono);color:var(--accent);white-space:nowrap;pointer-events:none}
+.sg-end{position:absolute;right:0;top:28px;font:600 12px var(--mono);color:var(--muted);pointer-events:none}
 .sg-vol{display:flex;align-items:center;gap:8px;color:var(--muted);font:600 14px var(--mono)}
 .sg-vol svg{width:22px;height:22px}
 .sg-vol input{width:min(240px,50vw);height:32px;accent-color:var(--accent);cursor:pointer}
 .sg-vol output{min-width:4ch;text-align:right}
-.sg-scrub{position:relative;width:min(560px,100%);padding:12px 0 32px;cursor:pointer;touch-action:none;user-select:none;-webkit-user-select:none;--open:0%;--pos:0%}
-.sg-track{position:relative;height:14px;border-radius:999px;background:var(--panel2);box-shadow:inset 0 0 0 1px var(--line)}
-.sg-open{position:absolute;left:0;top:0;bottom:0;width:var(--open);min-width:6px;border-radius:999px;background:color-mix(in srgb,var(--accent) 30%,transparent)}
-.sg-fill{position:absolute;left:0;top:0;bottom:0;width:var(--pos);border-radius:999px;background:var(--accent)}
-.sg-track i{position:absolute;top:-3px;bottom:-3px;width:2px;margin-left:-1px;border-radius:1px;background:var(--line)}
-.sg-knob{position:absolute;top:50%;left:var(--pos);width:22px;height:22px;margin:-11px 0 0 -11px;border-radius:50%;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.5)}
-.sg-tip{position:absolute;top:32px;left:clamp(18px,var(--pos),calc(100% - 18px));transform:translateX(-50%);font:700 13px var(--mono);color:var(--accent);white-space:nowrap;pointer-events:none}
-.sg-tip::before{content:"\25B2";display:block;text-align:center;font-size:8px;line-height:1.1}
-.sg-end{position:absolute;right:0;top:34px;font:600 12px var(--mono);color:var(--muted);pointer-events:none}
 .meta{font-family:var(--mono);font-size:14px;color:var(--muted);margin:0}
-.bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
-.search{position:relative;flex:1 1 260px;min-width:0}
-.search input{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--fg);font:18px var(--body);padding:13px 14px;border-radius:9px}
-.sugg{position:absolute;left:0;right:0;top:calc(100% + 4px);background:var(--panel2);border:1px solid var(--line);border-radius:9px;max-height:320px;overflow:auto;z-index:5;margin:0;padding:4px;list-style:none;box-shadow:0 10px 30px rgba(0,0,0,.5)}
-.sugg li{padding:11px 12px;border-radius:6px;cursor:pointer;font-size:17px}
+.sg-left .meta{text-align:center}
+/* Right column */
+.sg-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.sg-stats div{border:1px solid var(--line);border-radius:16px;padding:16px}
+.sg-stats b{display:block;font:400 40px/1.1 var(--display)}
+.sg-stats b.ac{color:var(--accent)}
+.sg-stats span{font-size:14px;font-weight:700;color:var(--muted)}
+.sg-filters{display:flex;gap:12px;flex-wrap:wrap}
+.sg-filters label{display:flex;flex-direction:column;gap:6px;font-size:14px;font-weight:700;color:var(--muted)}
+select,.lt input{background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:12px;padding:0 12px;font:500 16px var(--body);min-height:46px}
+.sg-filters select{min-width:180px}
+.dbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font:700 15px var(--body);color:var(--muted)}
+.dbar .dtag{background:var(--accent);color:var(--on-accent);border-radius:999px;padding:3px 10px;font:700 12px var(--body);letter-spacing:.06em;text-transform:uppercase}
+.sg-guess{font-size:14px;font-weight:700;color:var(--muted);margin-bottom:-14px}
+.search{position:relative;min-width:0}
+.search input{width:100%;min-height:60px;border:0;border-bottom:2px solid var(--accent);border-radius:0;background:transparent;color:var(--fg);padding:0 2px;font:400 28px var(--display)}
+.search input::placeholder{color:color-mix(in srgb,var(--muted) 75%,transparent)}
+.search input:focus-visible{outline:none;border-bottom-width:3px;box-shadow:0 3px 0 color-mix(in srgb,var(--accent) 35%,transparent)}
+.sugg{position:absolute;left:0;right:0;top:calc(100% + 4px);background:var(--panel2);border:1px solid var(--line);border-radius:12px;max-height:320px;overflow:auto;z-index:5;margin:0;padding:4px;list-style:none;box-shadow:0 10px 30px rgba(0,0,0,.4)}
+.sugg li{padding:11px 12px;border-radius:8px;cursor:pointer;font:500 17px var(--body)}
 .sugg li small{display:block;color:var(--muted);font-size:14px}
 .sugg li[aria-selected="true"],.sugg li:hover{background:color-mix(in srgb,var(--accent) 30%,transparent)}
-.btn{background:var(--panel2);border:1px solid var(--line);color:var(--fg);font:600 16px var(--body);padding:13px 18px;border-radius:9px;cursor:pointer;white-space:nowrap;min-height:50px}
+.sg-btns{display:flex;gap:12px;flex-wrap:wrap}
+.sg-btn{min-height:50px;padding:0 28px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--fg);font:700 16px var(--body);cursor:pointer}
+.sg-btn:hover{border-color:var(--accent)}
+.sg-btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.sg-btn.primary:hover{filter:brightness(1.08)}
+.btn{background:var(--panel2);border:1px solid var(--line);color:var(--fg);font:700 16px var(--body);padding:13px 18px;border-radius:999px;cursor:pointer;white-space:nowrap;min-height:50px}
+.btn:hover{border-color:var(--accent)}
 .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
-.left{text-align:center}
-.sg-rows{display:flex;flex-direction:column;gap:6px;max-width:720px;margin:10px auto 0}
-.sg-row{display:flex;gap:6px}
-.sg-row span{flex:1;min-width:0;border-radius:8px;padding:9px 8px;text-align:center;font-weight:600;font-size:16px;overflow-wrap:anywhere;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45);box-shadow:inset 0 0 0 2px rgba(0,0,0,.18)}
-.sg-row small{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.06em;opacity:.85}
+/* Guesses: SONG / ARTIST / YEAR columns; a skip is a dashed row */
+.sg-rowhead,.sg-row{display:grid;grid-template-columns:2fr 2fr 1fr;gap:8px}
+.sg-rowhead{margin-bottom:-14px}
+.sg-rowhead span{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.sg-rows{display:flex;flex-direction:column;gap:8px}
+.sg-row span{min-width:0;border-radius:8px;padding:12px;font-size:16px;font-weight:700;color:#fff;overflow-wrap:anywhere}
+.sg-row small{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 .sg-row .hit{background:var(--hit)}.sg-row .near{background:var(--near)}.sg-row .miss{background:var(--miss)}
+.sg-row .skip{grid-column:1/-1;background:none;border:1px dashed var(--line);color:var(--muted)}
 .sg-row.new span{animation:flip .4s both}.sg-row.new span:nth-child(2){animation-delay:.15s}.sg-row.new span:nth-child(3){animation-delay:.3s}
 @keyframes flip{from{transform:rotateX(90deg);opacity:.2}to{transform:none;opacity:1}}
-.legend{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;font-size:14px;color:var(--muted);margin-top:12px}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:14px;color:var(--muted);margin-top:-8px}
 .legend i{display:inline-block;width:13px;height:13px;border-radius:3px;margin-right:5px;vertical-align:-1px}
-.win{display:flex;gap:16px;align-items:center;border:2px solid var(--hit);border-radius:12px;padding:14px 16px;margin-bottom:14px;background:color-mix(in srgb,var(--hit) 14%,var(--panel))}
-.win.lose{border-color:var(--miss);background:color-mix(in srgb,var(--miss) 14%,var(--panel))}
-.win h3{margin:0 0 4px;font-family:var(--display);font-weight:400;font-size:20px}
+/* End of the round: album art, answer, add-to-library buttons */
+.win{display:flex;gap:16px;align-items:center;border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:16px;padding:16px;background:var(--panel)}
+.win.lose{border-left-color:var(--miss)}
+.win h3{margin:0 0 4px;font:400 26px/1.15 var(--display)}
 .win .actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
-.av{width:110px;height:110px;border-radius:8px;object-fit:cover;background:var(--panel2);flex:none}
-.sg-got{display:block;margin-top:6px;font:700 16px var(--body)}
-.prev{text-align:center;color:var(--muted);font-size:15px;margin:12px 0 0}.prev b{color:var(--fg)}
-.clue{background:var(--panel2);border-radius:12px;padding:18px;font-size:17px;line-height:1.5}
+.av{width:120px;height:120px;border-radius:10px;object-fit:cover;background:var(--panel2);flex:none}
+.sg-got{display:block;margin-top:8px;font:700 16px var(--body)}
+.sg-links{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}.sg-links span{font-size:14px;color:var(--muted);width:100%}.sg-links .btn{text-decoration:none;display:inline-flex;align-items:center;min-height:44px;padding:8px 16px}
+.prev{color:var(--muted);font-size:15px;margin:0}.prev b{color:var(--fg)}
+.clue{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px;font-size:17px;line-height:1.5}
 .share{white-space:pre;font-size:20px;line-height:1.2}
+/* Song list */
 .lt{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}.lt input{flex:1 1 220px}
 .listwrap{overflow:auto}
 table.list{border-collapse:collapse;width:100%;font-size:15px}
-table.list th{position:sticky;top:0;background:var(--panel);text-align:left;font:600 13px var(--body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:8px;border-bottom:1px solid var(--line)}
+table.list th{position:sticky;top:0;background:var(--bg);text-align:left;font:700 13px var(--body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:8px;border-bottom:1px solid var(--line)}
 table.list td{padding:10px 8px;border-bottom:1px solid var(--line);vertical-align:top}
-table.list td:first-child{font-weight:800}
+table.list td:first-child{font-weight:700}
 table.list td small{display:block;color:var(--muted);font-weight:500}
-table.list tr:hover td{background:var(--panel2)}
-dialog{border:1px solid #2c3040;border-radius:18px;padding:0;width:min(640px,calc(100vw - 20px));background:#14161c;color:#e9e9ee;box-shadow:0 20px 60px rgba(0,0,0,.7)}
+table.list tr:hover td{background:var(--panel)}
+/* Dialogs */
+dialog{border:1px solid var(--line);border-radius:18px;padding:0;width:min(640px,calc(100vw - 20px));background:var(--panel);color:var(--fg);box-shadow:0 20px 60px rgba(0,0,0,.6)}
 dialog::backdrop{background:rgba(0,0,0,.6);backdrop-filter:blur(2px)}
-dialog .hd{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid #2c3040}
-dialog .hd h2{margin:0;font:700 20px var(--body)}
+dialog .hd{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--line)}
+dialog .hd h2{margin:0;font:italic 400 26px var(--display)}
 dialog .bd{padding:16px 20px;max-height:70vh;overflow:auto;line-height:1.5}
-dialog .bd h3{margin:4px 0 8px;font:700 12px var(--body);letter-spacing:.1em;text-transform:uppercase;color:#8d90a3}
+dialog .bd h3{margin:4px 0 8px;font:700 12px var(--body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
 dialog ol{padding-left:1.3em;margin:0}dialog li{margin-bottom:8px}
-dialog .ft{display:flex;justify-content:flex-end;padding:12px 18px;border-top:1px solid #2c3040}
-.sx{background:none;border:0;color:#aaa;font-size:24px;cursor:pointer;min-width:44px;min-height:44px}
-.sopt{display:flex;width:100%;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border:1px solid #2c3040;border-radius:12px;background:#1a1d27;color:#e9e9ee;font:16px var(--body);text-align:left;cursor:pointer;margin:0 0 8px}
+dialog .ft{display:flex;justify-content:flex-end;padding:12px 18px;border-top:1px solid var(--line)}
+.sx{background:none;border:0;color:var(--muted);font-size:24px;cursor:pointer;min-width:44px;min-height:44px}
+.sopt{display:flex;width:100%;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--panel2);color:var(--fg);font:500 16px var(--body);text-align:left;cursor:pointer;margin:0 0 8px}
 .sopt[disabled]{cursor:not-allowed}.sopt[disabled] .tg{opacity:.5}
-.sopt b{font-weight:600}.sopt small{display:block;color:#8d90a3;font-size:13px;margin-top:2px}
-.tg{flex:none;width:44px;height:26px;border-radius:13px;background:#444a5a;position:relative;transition:background .2s}
+.sopt b{font-weight:700}.sopt small{display:block;color:var(--muted);font-size:13px;margin-top:2px}
+.tg{flex:none;width:44px;height:26px;border-radius:13px;background:color-mix(in srgb,var(--muted) 45%,var(--panel2));position:relative;transition:background .2s}
 .tg::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:left .2s}
 .tg.on{background:var(--accent)}.tg.on::after{left:21px}
-.sseg{display:flex;flex-wrap:wrap;gap:6px;background:#1c1f2a;padding:5px;border-radius:12px;border:1px solid #2c3040}
-.sseg button{flex:1;min-width:60px;min-height:46px;padding:8px 12px;border-radius:9px;border:0;background:none;color:#b9bccb;font:700 16px var(--body);cursor:pointer}
+.sseg{display:flex;flex-wrap:wrap;gap:6px;background:var(--panel2);padding:5px;border-radius:12px;border:1px solid var(--line)}
+.sseg button{flex:1;min-width:60px;min-height:46px;padding:8px 12px;border-radius:9px;border:0;background:none;color:var(--muted);font:700 16px var(--body);cursor:pointer}
 .sseg button[aria-checked="true"]{background:var(--accent);color:var(--on-accent)}
 .srow{display:flex;gap:8px;align-items:stretch}.srow .sopt{flex:1}
-.snote{font-size:14px;color:#9a9db0}
+.snote{font-size:14px;color:var(--muted)}
 .steps{padding-left:1.3em;margin:0 0 10px}.steps li{margin-bottom:12px}.steps .btn{width:100%;margin-top:2px}
-.imp input[type=text]{width:100%;background:#1a1d27;border:1px solid #2c3040;border-radius:10px;padding:11px 12px;color:#e9e9ee;font:16px var(--body);margin:4px 0 10px}
-@media (max-width:600px){body{font-size:16px}.stage{padding:14px 12px}.sg-controls{gap:10px}.sg-side{min-width:0;flex:1;padding:10px 8px}
- .top{flex-wrap:nowrap;gap:6px}.tabs{flex-wrap:nowrap;gap:5px}.tab{flex:1;padding:8px 6px;font-size:14px;line-height:1.15}.gearbtn{min-width:44px;padding:6px}.gearbtn span{display:none}.win{flex-direction:column;text-align:center}.win .actions,.sg-links{justify-content:center}
- .bar .search{flex:1 1 100%}.bar .btn{flex:1}.sg-row span{font-size:14px;padding:8px 5px}}
-@media (prefers-reduced-motion:reduce){.sg-play.playing::after,.sg-row.new span{animation:none}}
-.sg-links{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}.sg-links span{font-size:14px;color:var(--muted);width:100%}.sg-links .btn{text-decoration:none;display:inline-flex;align-items:center;min-height:44px;padding:8px 16px}
+.imp input[type=text]{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:11px 12px;color:var(--fg);font:500 16px var(--body);margin:4px 0 10px}
+/* Settings > Look: one swatch card per theme, drawn in its own colours */
+.sg-themes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.sopt.sg-th{flex-direction:column;align-items:flex-start;gap:8px;margin:0;background:var(--th-bg);color:var(--th-fg);border:2px solid var(--line)}
+.sopt.sg-th small{color:inherit;opacity:.75}
+.sopt.sg-th[aria-checked="true"]{border-color:var(--accent)}
+.sg-th .sw{display:flex;gap:4px}.sg-th .sw i{width:18px;height:18px;border-radius:50%;background:var(--th-ac)}.sg-th .sw i+i{background:var(--th-g2);box-shadow:0 0 0 1px rgba(127,127,127,.4)}
+@media (max-width:560px){.sg-themes{grid-template-columns:1fr}.sopt.sg-th{flex-direction:row;align-items:center;justify-content:flex-start}}
+@media (min-width:861px){.sg-mini{display:none}}
+/* Phones and small tablets: one column, record first, filters at the bottom, no stat cards */
+@media (max-width:860px){
+  .sg-layout{grid-template-columns:minmax(0,1fr);gap:20px}
+  .sg-stats{display:none}
+  .sg-right .sg-filters{order:9}
+  .sg-head{margin-bottom:18px}.logo{font-size:38px}
+  .sg-rec{width:min(360px,100%)}
+  .sg-label b,.sg-label em{display:none}
+  .sg-play{width:72px;height:72px}.sg-play svg{width:30px;height:30px}
+  .sg-filters label{flex:1 1 140px}.sg-filters select{min-width:0;width:100%}
+  .search input{min-height:52px;font-size:22px}
+  .sg-btn{flex:1;padding:0 16px;min-height:48px;font-size:16px}
+  .sg-rowhead{display:none}
+  .sg-row{grid-template-columns:repeat(auto-fit,minmax(0,1fr));gap:6px}
+  .sg-row span{padding:8px 6px;text-align:center;font-size:14px;border-radius:6px}
+  .sg-row small{position:static;width:auto;height:auto;clip:auto;display:block;font-size:10px;text-transform:uppercase;letter-spacing:.06em;opacity:.85}
+}
+@media (max-width:600px){body{font-size:16px}
+ .top{flex-wrap:nowrap;gap:6px}.tabs{flex-wrap:nowrap;gap:5px}.tab{flex:1;padding:8px 6px;font-size:14px;line-height:1.15}.gearbtn{min-width:44px;padding:6px}.gearbtn span{display:none}
+ .win{flex-direction:column;text-align:center}.win .actions,.sg-links{justify-content:center}}
+@media (prefers-reduced-motion:reduce){.sg-row.new span{animation:none}}
 </style>
 </head>
 <body>
@@ -158,7 +220,11 @@ dialog .ft{display:flex;justify-content:flex-end;padding:12px 18px;border-top:1p
 </dialog>
 
 <dialog id="settings"><div class="hd"><h2>Settings</h2><button class="sx" id="set-x" aria-label="Close">✕</button></div><div class="bd">
- <h3>First clip length</h3>
+ <h3>Look</h3>
+ <div class="sg-themes" id="themeseg" role="radiogroup" aria-label="Look"></div>
+ <h3 style="margin-top:18px">Record</h3>
+ <div class="sseg" id="spinseg" role="radiogroup" aria-label="Record"></div>
+ <h3 style="margin-top:18px">First clip length</h3>
  <div class="sseg" id="startseg" role="radiogroup" aria-label="First clip length"></div>
  <p class="snote" id="startnote"></p>
  <h3 style="margin-top:18px">When you press Skip</h3>
@@ -195,8 +261,15 @@ let CLIPS=LADDERS["0.1"];
 const ERAS=[["All",0,9999],["Classic (before 2000)",0,1999],["2000s",2000,2009],["2010s",2010,2019],["2020s",2020,9999]];
 let BUILTIN={};                              // playlists.json: {"Charts":[{t,a,y,g,i,c}], ...}
 let IMPORTS=load("sd_imports",[]);           // [{id,name,songs}]
-const CFG=Object.assign({on:{},genre:"All",era:"All",start:"0.1",flow:true},load("sd_cfg",{}));if(!LADDERS[CFG.start])CFG.start="0.1";CLIPS=LADDERS[CFG.start];
+const CFG=Object.assign({on:{},genre:"All",era:"All",start:"0.1",flow:true,theme:"emerald",spin:"playing"},load("sd_cfg",{}));if(!LADDERS[CFG.start])CFG.start="0.1";CLIPS=LADDERS[CFG.start];
 let YEARFIX=load("sd_years",{});
+// Look (Settings): Emerald, Forest or Sage, and whether the record spins. [name, description, accent, groove, background, text]
+const THEMES={emerald:["Emerald","Dark, bright green","#2fbf71","#131714","#070908","#eef3ee"],forest:["Forest","Dark, soft sage","#a9c9a4","#142019","#0b130f","#e7eee3"],sage:["Sage","Light, deep green","#1f4d36","#1b221d","#dfe6d8","#13241a"]};
+const SPINS=[["playing","Spin while playing"],["always","Always spin"],["still","Still"]];
+function applyLook(){if(!THEMES[CFG.theme])CFG.theme="emerald";if(!SPINS.some(x=>x[0]===CFG.spin))CFG.spin="playing";
+  const r=document.documentElement;r.dataset.sgtheme=CFG.theme;r.dataset.sgspin=CFG.spin;
+  const m=document.querySelector('meta[name="theme-color"]');if(m)m.content=THEMES[CFG.theme][4]}
+applyLook();
 
 function allLists(){return[...Object.keys(BUILTIN).map(n=>({id:"b:"+n,name:n,songs:BUILTIN[n],builtin:true})),...IMPORTS.map(x=>({id:"u:"+x.id,name:x.name,songs:x.songs}))]}
 function listOn(id){return CFG.on[id]!==undefined?CFG.on[id]:id==="b:Charts"}
@@ -356,7 +429,7 @@ function stop(){if(timer){clearTimeout(timer);timer=null}cancelAnimationFrame(ra
   if(audio)audio.pause();const b=$("#play");if(b){b.classList.remove("playing");b.setAttribute("aria-label","Play")}draw()}
 function draw(){const sc=$("#sg-scrub");if(!sc||!ctx)return;const {st,limit,total}=ctx;
   const t=audio&&!audio.paused?Math.min(audio.currentTime,limit):st.pos||0;
-  sc.style.setProperty("--open",limit/total*100+"%");sc.style.setProperty("--pos",t/total*100+"%");
+  for(const el of [sc,$("#sg-rec")])if(el){el.style.setProperty("--open",limit/total*100+"%");el.style.setProperty("--pos",t/total*100+"%")}
   $("#sg-pos").textContent=t.toFixed(1)+"s";sc.setAttribute("aria-valuemax",limit.toFixed(1));sc.setAttribute("aria-valuenow",t.toFixed(1))}
 function keepPlaying(){const c=ctx;const b=$("#play");if(b){b.classList.add("playing");b.setAttribute("aria-label","Pause")}
   const end=()=>{if(ctx!==c)return;if(timer){clearTimeout(timer);timer=null}cancelAnimationFrame(raf);audio.pause();c.st.pos=c.limit;stop()};
@@ -384,47 +457,61 @@ function prefetch(){if(nextSong)return;const pool=songPool();if(pool.length<2)re
 let carry=false;
 function render(){if(carry){if(timer){clearTimeout(timer);timer=null}cancelAnimationFrame(raf)}else stop();ctx=null;document.querySelectorAll(".tab").forEach(b=>b.setAttribute("aria-pressed",b.dataset.tab===tab));
   if(tab==="list")return renderList();
-  if(!Object.keys(BUILTIN).length&&!IMPORTS.length){$("#stage").innerHTML=`<div class="logo">Song<span>dle</span></div><p class="meta" style="text-align:center">Loading songs…</p>`;return}
+  if(!Object.keys(BUILTIN).length&&!IMPORTS.length){$("#stage").innerHTML=head()+`<p class="meta">Loading songs…</p>`;return}
   if(tab==="daily"){const st=dailyState();st.target=dailySong(st.date);return renderGame(st)}
   if(!round)round=newRound();renderGame(round)}
 
-const FLAME='<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2c1 3.5-1.5 5-1.5 7.5 0 1.4 1 2.5 2.3 2.5 1.5 0 2.4-1.2 2.2-3 2.6 1.9 4 4.6 4 7.5A7 7 0 0 1 5 16.5c0-4.6 4.2-7.2 7-14.5z"/></svg>';
-function banner(daily){const s=daily?DSTATS:STATS;return`<div class="logo">Song<span>dle</span></div><div class="chips"><span class="chip">${FLAME}Streak ${s.streak}</span><span class="chip ghost">Best ${s.best}</span><span class="chip ghost">Wins ${s.w}</span></div>`}
+// Header: logo with a thin line under it; on phones "Streak · Best · Wins" sits next to it (the stat cards are hidden there)
+function head(s){return`<div class="sg-head"><h1 class="logo">Song<span>dle</span></h1>${s?`<span class="sg-mini">Streak ${s.streak} · Best ${s.best} · Wins ${s.w}</span>`:""}</div>`}
 const PLAYSVG='<svg class="i-play" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg><svg class="i-pause" viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>';
 const VOLSVG='<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4zm12.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4z"/></svg>';
 
 function renderGame(st){
-  const t=st.target,daily=!!st.daily;let h=banner(daily);
-  if(daily)h+=`<div class="dbar"><span class="dtag">Daily</span>Same song for everyone · ${new Date().toLocaleDateString(undefined,{weekday:"long",day:"numeric",month:"long"})}</div>`;
+  const t=st.target,daily=!!st.daily,S=daily?DSTATS:STATS;let h=head(S);
+  // Genre and era for Play; Today's song says what it is instead
+  let filt;
+  if(daily)filt=`<div class="dbar"><span class="dtag">Daily</span>Same song for everyone · ${new Date().toLocaleDateString(undefined,{weekday:"long",day:"numeric",month:"long"})}</div>`;
   else{const genres=["All",...[...new Set(songSource().map(x=>x.g).filter(Boolean))].sort()];
-    h+=`<div class="sg-filters"><label>Genre <select id="genre">${genres.map(g=>`<option${CFG.genre===g?" selected":""}>${esc(g)}</option>`).join("")}</select></label>
+    filt=`<div class="sg-filters"><label>Genre <select id="genre">${genres.map(g=>`<option${CFG.genre===g?" selected":""}>${esc(g)}</option>`).join("")}</select></label>
       <label>Era <select id="era">${ERAS.map(e=>`<option value="${e[0]}"${CFG.era===e[0]?" selected":""}>${e[0]}</option>`).join("")}</select></label></div>`}
-  if(!t){h+=`<div class="clue">No songs match these choices. Try a different genre or era, or switch more lists on in Settings.</div>`;$("#stage").innerHTML=h;wireFilters();return}
+  if(!t){h+=filt+`<div class="clue" style="margin-top:16px">No songs match these choices. Try a different genre or era, or switch more lists on in Settings.</div>`;$("#stage").innerHTML=h;wireFilters();return}
   const step=Math.min(st.guesses.length,CLIPS.length-1),len=CLIPS[step];
   const total=st.done?30:CLIPS[CLIPS.length-1],limit=st.done?30:len;
   if(st.seen!==limit){st.seen=limit;if(!st.keepPos)st.pos=0}st.keepPos=false;
   ctx={st,limit,total};
-  h+=`<div class="sg-player"><div class="sg-controls">${st.done?`<span class="sg-side"></span>`:`<button class="btn sg-side" id="skip">Skip<small>+${CLIPS[Math.min(step+1,CLIPS.length-1)]}s</small></button>`}
-    <button class="sg-play" id="play" aria-label="Play" disabled>${PLAYSVG}</button>
-    ${st.done&&!daily?`<button class="btn primary sg-side" id="next">Next song</button>`:`<span class="sg-side"></span>`}</div>
-    ${VOLOK?`<label class="sg-vol" for="vol">${VOLSVG}<span class="sr">Volume</span><input type="range" id="vol" min="0" max="100" step="1" value="${Math.round(vol*100)}" aria-label="Volume"><output id="vol-out">${Math.round(vol*100)}%</output></label>`:""}
-    <div class="sg-scrub" id="sg-scrub" role="slider" tabindex="0" aria-label="Position in the clip" aria-valuemin="0" style="--open:${limit/total*100}%;--pos:0%">
+  // Left: the record (ring = unlocked part of the clip, lighter where it has played; play button in the label),
+  // the clip lengths, the scrubber and the volume
+  const gap=!st.done&&step<CLIPS.length-1?+(CLIPS[step+1]-CLIPS[step]).toFixed(1):0,nLeft=CLIPS.length-st.guesses.length,pos=`--open:${limit/total*100}%;--pos:0%`;
+  h+=`<div class="sg-layout"><div class="sg-left">
+    <div class="sg-rec" id="sg-rec" style="${pos}">
+      <div class="sg-ring"></div>
+      <div class="sg-disc"><i class="sg-grooves"></i><i class="sg-glint"></i><div class="sg-label" aria-hidden="true"><b>SONGDLE</b><em>side A · 33⅓</em></div></div>
+      <div class="sg-sheen"></div>
+      <button class="sg-play" id="play" aria-label="Play" disabled>${PLAYSVG}</button>
+    </div>
+    <div class="sg-clips" role="list" aria-label="Clip lengths">${CLIPS.map((c,i)=>`<span role="listitem" class="${st.done||i<step?"on":i===step?"cur":""}"${!st.done&&i===step?' aria-current="step"':""}>${c}s</span>`).join("")}</div>
+    <div class="sg-scrub" id="sg-scrub" role="slider" tabindex="0" aria-label="Position in the clip" aria-valuemin="0" style="${pos}">
       <div class="sg-track"><div class="sg-open"></div><div class="sg-fill"></div>${st.done?"":CLIPS.slice(0,-1).map(c=>`<i style="left:${c/total*100}%"></i>`).join("")}<div class="sg-knob"></div></div>
       <div class="sg-tip"><span id="sg-pos">0.0s</span></div><span class="sg-end">${st.done?"":limit+"s of "+total+"s"}</span></div>
+    ${VOLOK?`<label class="sg-vol" for="vol">${VOLSVG}<span class="sr">Volume</span><input type="range" id="vol" min="0" max="100" step="1" value="${Math.round(vol*100)}" aria-label="Volume"><output id="vol-out">${Math.round(vol*100)}%</output></label>`:""}
     <p class="meta" id="status" role="status">${st.done?"Full preview":"Clip: "+len+"s"} · loading…</p></div>`;
-  if(st.done){h+=`<div class="win${st.won?"":" lose"}"><img id="art" class="av" alt="" hidden><div><h3>${esc(t.t)}</h3><span class="meta">${esc(t.a)} · ${t.y||"?"}${t.g?" · "+esc(t.g):""} · ${st.guesses.length} guess${st.guesses.length===1?"":"es"}</span>
+  // Right: stat cards, filters, then the guess box and buttons (or the answer), then the guesses
+  let r=`<div class="sg-stats"><div><b class="ac">${S.streak}</b><span>Current streak</span></div><div><b>${S.best}</b><span>Best streak</span></div><div><b>${S.w}</b><span>Wins</span></div></div>`+filt;
+  if(st.done){r+=`<div class="win${st.won?"":" lose"}"><img id="art" class="av" alt="" hidden><div><h3>${esc(t.t)}</h3><span class="meta">${esc(t.a)} · ${t.y||"?"}${t.g?" · "+esc(t.g):""} · ${st.guesses.length} guess${st.guesses.length===1?"":"es"}</span>
       ${st.won?(c=>`<span class="sg-got">Got it in ${c} second${c===1?"":"s"}</span>`)(CLIPS[Math.min(st.guesses.length-1,CLIPS.length-1)]):`<span class="sg-got">Better luck next time</span>`}
-      <div class="sg-links"><span>Add it to your music:</span><a class="btn" id="lk-am" target="_blank" rel="noopener" href="https://music.apple.com/search?term=${encodeURIComponent(t.t+" "+t.a)}">Apple Music</a><a class="btn" target="_blank" rel="noopener" href="https://open.spotify.com/search/${encodeURIComponent(t.t+" "+t.a)}">Spotify</a><a class="btn" target="_blank" rel="noopener" href="https://music.youtube.com/search?q=${encodeURIComponent(t.t+" "+t.a)}">YouTube Music</a></div>
-${daily?`<div class="actions"><button class="btn primary" id="share">Copy my score</button></div><p id="sharemsg" class="meta" role="status"></p><p class="meta">A new song tomorrow.</p>`:""}</div></div>`}
-  else h+=`<div class="bar"><div class="search"><label for="guess" class="sr">Your guess</label><input id="guess" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="Type a song title…" role="combobox" aria-expanded="false" aria-controls="sugg"><ul class="sugg" id="sugg" role="listbox" hidden></ul></div>
-     <button class="btn" id="giveup">Give up</button></div>
-    <p class="meta left">${CLIPS.length-st.guesses.length} guess${CLIPS.length-st.guesses.length===1?"":"es"} left</p>`;
+      <div class="sg-links"><span>Add it to your music:</span><a class="btn" id="lk-am" target="_blank" rel="noopener" href="https://music.apple.com/search?term=${encodeURIComponent(t.t+" "+t.a)}">Apple Music</a><a class="btn" target="_blank" rel="noopener" href="https://open.spotify.com/search/${encodeURIComponent(t.t+" "+t.a)}">Spotify</a><a class="btn" target="_blank" rel="noopener" href="https://music.youtube.com/search?q=${encodeURIComponent(t.t+" "+t.a)}">YouTube Music</a></div></div></div>`;
+    r+=daily?`<div class="sg-btns"><button class="sg-btn primary" id="share">Copy my score</button></div><p id="sharemsg" class="meta" role="status"></p><p class="meta">A new song tomorrow.</p>`
+      :`<div class="sg-btns"><button class="sg-btn primary" id="next">Next song</button></div>`}
+  else r+=`<label class="sg-guess" for="guess">Your guess · ${nLeft} left</label><div class="search"><input id="guess" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="done" placeholder="Type a song title…" role="combobox" aria-expanded="false" aria-controls="sugg"><ul class="sugg" id="sugg" role="listbox" hidden></ul></div>
+    <div class="sg-btns"><button class="sg-btn primary" id="skip">Skip${gap?" +"+gap+"s":""}</button><button class="sg-btn" id="giveup">Give up</button></div>`;
   const fresh=st.fresh;st.fresh=false;
-  h+=`<div class="sg-rows">`+st.guesses.slice().reverse().map((g,gi)=>{const nw=gi===0&&fresh?" new":"";if(g.skip)return`<div class="sg-row${nw}"><span class="miss">Skipped</span></div>`;
+  if(st.guesses.length)r+=`<div class="sg-rowhead" aria-hidden="true"><span>Song</span><span>Artist</span><span>Year</span></div>`;
+  r+=`<div class="sg-rows">`+st.guesses.slice().reverse().map((g,gi)=>{const nw=gi===0&&fresh?" new":"";if(g.skip)return`<div class="sg-row${nw}"><span class="skip">Skipped</span></div>`;
     const ya=!g.y||!t.y||g.y===t.y?"":t.y>g.y?" ▲":" ▼";
     return`<div class="sg-row${nw}"><span class="${g.k===t.k?"hit":"miss"}"><small>Song</small>${esc(g.t)}</span><span class="${artistMatch(g,t)}"><small>Artist</small>${esc(g.a)}</span><span class="${g.y&&g.y===t.y?"hit":"miss"}"><small>Year</small>${g.y||"?"}${ya}</span></div>`}).join("")+`</div>`;
-  if(st.guesses.some(g=>!g.skip))h+=`<div class="legend"><span><i style="background:var(--hit)"></i>Right</span><span><i style="background:var(--near)"></i>A singer is right</span><span><i style="background:var(--miss)"></i>Wrong</span><span>▲ newer · ▼ older</span></div>`;
-  if(lastAns&&!daily)h+=`<p class="prev">Previous song was <b>${esc(lastAns)}</b></p>`;
+  if(st.guesses.some(g=>!g.skip))r+=`<div class="legend"><span><i style="background:var(--hit)"></i>Right</span><span><i style="background:var(--near)"></i>A singer is right</span><span><i style="background:var(--miss)"></i>Wrong</span><span>▲ newer · ▼ older</span></div>`;
+  if(lastAns&&!daily)r+=`<p class="prev">Previous song was <b>${esc(lastAns)}</b></p>`;
+  h+=`<div class="sg-right">${r}</div></div>`;
   $("#stage").innerHTML=h;wireFilters();draw();
 
   const status=$("#status"),pb=$("#play");
@@ -506,7 +593,7 @@ function wireSearch(pool,onPick){
 /* ---------- Song list ---------- */
 const LV={q:"",genre:"All",era:"All"};
 function renderList(){const genres=["All",...[...new Set(songSource().map(x=>x.g).filter(Boolean))].sort()];
-  $("#stage").innerHTML=`<div class="logo">Song<span>dle</span></div><div class="lt"><label class="sr" for="lq">Search</label><input type="search" id="lq" placeholder="Search songs or singers" value="${esc(LV.q)}">
+  $("#stage").innerHTML=head()+`<div class="lt"><label class="sr" for="lq">Search</label><input type="search" id="lq" placeholder="Search songs or singers" value="${esc(LV.q)}">
    <select id="lg" aria-label="Genre">${genres.map(g=>`<option value="${esc(g)}"${LV.genre===g?" selected":""}>${g==="All"?"All genres":esc(g)}</option>`).join("")}</select>
    <select id="le" aria-label="Era">${ERAS.map(e=>`<option value="${e[0]}"${LV.era===e[0]?" selected":""}>${e[0]==="All"?"All eras":e[0]}</option>`).join("")}</select></div>
    <p id="lcount" class="meta" style="margin-bottom:8px"></p><div class="listwrap"><table class="list"><thead><tr><th>Song</th><th>Artist</th><th>Year</th><th>Genre</th></tr></thead><tbody id="lbody"></tbody></table></div>`;
@@ -536,6 +623,10 @@ function parseCSV(text){
 }
 function changed(){ensureOneOn();save("sd_cfg",CFG);srcCache=null;round=null;nextSong=null;renderSettings();render()}
 function renderSettings(){ensureOneOn();
+  $("#themeseg").innerHTML=Object.entries(THEMES).map(([k,[n,sub,ac,g2,bg,fg]])=>`<button class="sopt sg-th" role="radio" aria-checked="${CFG.theme===k}" data-theme="${k}" style="--th-bg:${bg};--th-fg:${fg};--th-ac:${ac};--th-g2:${g2}"><span class="sw" aria-hidden="true"><i></i><i></i></span><span><b>${n}</b><small>${sub}</small></span></button>`).join("");
+  $("#themeseg").querySelectorAll("button").forEach(b=>b.onclick=()=>{CFG.theme=b.dataset.theme;save("sd_cfg",CFG);applyLook();renderSettings()});
+  $("#spinseg").innerHTML=SPINS.map(([v,l])=>`<button role="radio" aria-checked="${CFG.spin===v}" data-spin="${v}">${l}</button>`).join("");
+  $("#spinseg").querySelectorAll("button").forEach(b=>b.onclick=()=>{CFG.spin=b.dataset.spin;save("sd_cfg",CFG);applyLook();renderSettings()});
   $("#flowseg").innerHTML=[[true,"Carry on"],[false,"Start again"]].map(([v,l])=>`<button role="radio" aria-checked="${CFG.flow===v}" data-flow="${v}">${l}</button>`).join("");
   $("#flownote").textContent=CFG.flow?"The music keeps going from where it got to, into the longer clip.":"Each longer clip plays from the beginning of the song.";
   $("#flowseg").querySelectorAll("button").forEach(b=>b.onclick=()=>{CFG.flow=b.dataset.flow==="true";save("sd_cfg",CFG);renderSettings()});

@@ -10,6 +10,8 @@ Spotify, Apple Music or YouTube Music playlist or album link (in the app: ••
 to be public (or unlisted on YouTube Music); Spotify links bring in up to 100 songs, YouTube Music up to 200. Added lists
 are saved on that device only.
 
+It has the same green record-player look as Songdle in Yahyadle. Settings → Look switches between Emerald (the default), Forest and Sage (light), and Settings → Record sets whether the record spins.
+
 ## How it's built
 
 - `index.html`: the whole game (no build step)
