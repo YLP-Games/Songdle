@@ -1,0 +1,396 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#14213d">
+<title>Songdle</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎵</text></svg>">
+<style>
+/* Big, high-contrast and simple: made for reading without glasses */
+:root{--bg:#fbf7ef;--panel:#fff;--fg:#111;--muted:#3d3d3d;--line:#8a8a8a;--accent:#14213d;--on-accent:#fff;--focus:#e85d04;
+ --hit:#16692f;--near:#b45309;--miss:#a61b1b;--soft:#efe9dc}
+*{box-sizing:border-box}
+html{font-size:20px;-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;line-height:1.45;
+ padding:0 max(16px,env(safe-area-inset-right)) 48px max(16px,env(safe-area-inset-left))}
+main{max-width:760px;margin:0 auto}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:4px solid var(--focus);outline-offset:3px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+header{display:flex;align-items:center;gap:12px;padding:16px 0 8px}
+h1{margin:0;font-size:2rem;letter-spacing:-.02em;flex:1}
+.iconbtn{min-width:56px;min-height:56px;border-radius:14px;border:2px solid var(--accent);background:var(--panel);font-size:1.4rem;cursor:pointer;display:grid;place-items:center}
+nav{display:flex;gap:8px;margin:4px 0 16px}
+nav button{flex:1;min-height:56px;border-radius:14px;border:2px solid var(--accent);background:var(--panel);font-weight:700;cursor:pointer}
+nav button[aria-selected=true]{background:var(--accent);color:var(--on-accent)}
+.btn{min-height:56px;padding:10px 20px;border-radius:14px;border:2px solid var(--accent);background:var(--panel);font-weight:700;cursor:pointer}
+.btn.primary{background:var(--accent);color:var(--on-accent)}
+.btn:disabled{opacity:.45;cursor:default}
+.chips{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:14px}
+.chip{padding:6px 14px;border-radius:999px;background:var(--soft);border:2px solid var(--line);font-weight:700;font-size:.9rem}
+.filters{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;margin-bottom:16px}
+.filters label{display:flex;align-items:center;gap:8px;font-weight:700}
+select,input[type=text],input[type=search]{min-height:52px;border-radius:12px;border:2px solid var(--line);background:var(--panel);padding:8px 12px}
+.player{display:flex;flex-direction:column;align-items:center;gap:14px;background:var(--panel);border:2px solid var(--line);border-radius:20px;padding:18px}
+.controls{display:flex;align-items:center;justify-content:center;gap:16px;width:100%}
+.controls .side{flex:1;display:flex}.controls .side:first-child{justify-content:flex-end}
+.play{width:96px;height:96px;flex:none;border-radius:50%;border:0;background:var(--accent);color:#fff;cursor:pointer;display:grid;place-items:center}
+.play svg{width:44px;height:44px}
+.play .i-pause,.play.playing .i-play{display:none}.play.playing .i-pause{display:block}
+.play:disabled{opacity:.4}
+.skip small{display:block;font-size:.8rem;font-weight:600}
+.track{position:relative;width:100%;height:18px;border-radius:999px;background:var(--soft);border:2px solid var(--line);overflow:hidden}
+.track .open{position:absolute;inset:0 auto 0 0;background:#c9d3ea}
+.track .fill{position:absolute;inset:0 auto 0 0;background:var(--accent)}
+.track i{position:absolute;top:0;bottom:0;width:2px;background:var(--line)}
+.status{margin:0;font-weight:600;text-align:center;color:var(--muted)}
+.vol{display:flex;align-items:center;gap:10px;width:100%;max-width:420px;font-weight:700}
+.vol input{flex:1;height:44px;accent-color:var(--accent)}
+.guessbar{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px}
+.search{position:relative;flex:1 1 100%}
+.search input{width:100%;font-size:1.1rem}
+.guessbar .btn{flex:1}
+.sugg{list-style:none;margin:4px 0 0;padding:0;position:absolute;left:0;right:0;z-index:5;background:var(--panel);border:2px solid var(--accent);border-radius:12px;max-height:60vh;overflow:auto;box-shadow:0 8px 24px rgba(0,0,0,.2)}
+.sugg li{padding:12px 14px;border-bottom:1px solid var(--soft);cursor:pointer;min-height:52px}
+.sugg li[aria-selected=true],.sugg li:hover{background:#dde4f5}
+.sugg li small{display:block;color:var(--muted)}
+.left{text-align:center;font-weight:700;margin:12px 0 6px}
+.rows{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.row{display:grid;grid-template-columns:1.3fr 1fr .8fr;gap:6px}
+.row span{border-radius:10px;padding:8px;color:#fff;font-weight:700;text-align:center;overflow-wrap:anywhere;font-size:.95rem}
+.row span small{display:block;font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;opacity:.95}
+.row .hit{background:var(--hit)}.row .near{background:var(--near)}.row .miss{background:var(--miss)}
+.row .skipped{grid-column:1/-1;background:#555}
+.legend{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;font-size:.85rem;margin-top:12px}
+.legend b{display:inline-block;width:18px;height:18px;border-radius:4px;vertical-align:-3px;margin-right:4px}
+.result{margin-top:18px;display:flex;gap:16px;align-items:center;background:var(--panel);border:3px solid var(--hit);border-radius:20px;padding:16px}
+.result.lose{border-color:var(--miss)}
+.result img{width:110px;height:110px;border-radius:12px;flex:none}
+.result h2{margin:0 0 4px;font-size:1.3rem}
+.result p{margin:2px 0}
+.result .actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px}
+.prev{text-align:center;color:var(--muted);margin-top:14px}
+.note{background:var(--soft);border-radius:14px;padding:12px 16px}
+table{width:100%;border-collapse:collapse;font-size:.9rem;background:var(--panel)}
+th,td{text-align:left;padding:10px 8px;border-bottom:1px solid #ccc;vertical-align:top}
+th{position:sticky;top:0;background:var(--accent);color:#fff}
+td small{color:var(--muted)}
+.listtools{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px}
+.listtools input{flex:1 1 220px}
+dialog{border:0;border-radius:20px;padding:0;max-width:min(620px,calc(100vw - 24px));width:100%;color:var(--fg);background:var(--panel)}
+dialog::backdrop{background:rgba(0,0,0,.55)}
+dialog .in{padding:20px 22px;max-height:85vh;overflow:auto}
+dialog h2{margin:0 0 10px}
+dialog ol{padding-left:1.3em}dialog li{margin-bottom:8px}
+.switch{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid var(--soft)}
+.switch input{width:34px;height:34px;accent-color:var(--hit);flex:none}
+.switch .x{min-height:44px;padding:4px 12px;font-size:.85rem}
+.closebar{display:flex;justify-content:flex-end;margin-top:16px}
+.share{white-space:pre;font-size:1.3rem;line-height:1.2}
+@media (max-width:520px){html{font-size:18px}.row{grid-template-columns:1fr 1fr .8fr}.result{flex-direction:column;text-align:center}.result .actions{justify-content:center}
+ .controls{gap:10px}.btn{padding:10px 14px}}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1115;--panel:#1b1e25;--fg:#fff;--muted:#d0d0d0;--line:#9aa0aa;--accent:#ffd166;--on-accent:#111;--soft:#2a2e37}
+ .play{color:#111}.track .open{background:#5a5030}.sugg li[aria-selected=true],.sugg li:hover{background:#3a3420}th{color:#111}}
+</style>
+</head>
+<body>
+<main>
+<header><h1>🎵 Songdle</h1>
+ <button class="iconbtn" id="help" aria-label="How to play">?</button>
+ <button class="iconbtn" id="gear" aria-label="Settings">⚙️</button></header>
+<nav role="tablist">
+ <button role="tab" data-tab="play">Play</button>
+ <button role="tab" data-tab="daily">Today's song</button>
+ <button role="tab" data-tab="list">Song list</button>
+</nav>
+<div id="stage"></div>
+</main>
+
+<dialog id="how"><div class="in">
+ <h2>How to play</h2>
+ <ol>
+  <li>Press the big <b>▶ play</b> button to hear a tiny piece of a song.</li>
+  <li>Start typing the song's name and <b>tap it in the list</b>.</li>
+  <li>Not sure? Press <b>Skip</b> to hear a longer piece. Each wrong guess also makes it longer. You get 5 tries.</li>
+  <li>The coloured boxes help you:
+   <br><b style="color:var(--hit)">Green</b> = right. <b style="color:var(--near)">Orange</b> = one of the singers is right. <b style="color:var(--miss)">Red</b> = wrong.
+   <br>For the year, an arrow ▲ means the song is <b>newer</b>, ▼ means it is <b>older</b>.</li>
+  <li><b>Today's song</b> is the same for everyone, so you can compare scores.</li>
+ </ol>
+ <div class="closebar"><button class="btn primary" id="how-ok">Let's play</button></div>
+</div></dialog>
+
+<dialog id="settings"><div class="in">
+ <h2>Settings</h2>
+ <h3>Which songs to use</h3>
+ <div id="lists"></div>
+ <h3>Add your own playlist</h3>
+ <p>Save a playlist as a CSV file, then choose it here. From Spotify use <b>exportify.app</b>. From Apple Music use <b>tunemymusic.com</b> (choose "Export to file").</p>
+ <p><label>Name for this list<br><input type="text" id="imp-name" placeholder="e.g. Mum's favourites" style="width:100%"></label></p>
+ <p><label class="btn" style="display:inline-flex;align-items:center">Choose CSV file<input type="file" id="imp-file" accept=".csv,text/csv" class="sr"></label></p>
+ <p id="imp-msg" role="status"></p>
+ <p class="note">Imported lists are saved on this device only.</p>
+ <div class="closebar"><button class="btn primary" id="set-ok">Done</button></div>
+</div></dialog>
+
+<script>
+"use strict";
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const load=(k,d)=>{try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}};
+const save=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
+
+/* ---------- Song lists ---------- */
+const CLIPS=[0.1,0.5,2,8,15];
+const ERAS=[["All",0,9999],["Classic (before 2000)",0,1999],["2000s",2000,2009],["2010s",2010,2019],["2020s",2020,9999]];
+let BUILTIN={};                              // playlists.json: {"Charts":[{t,a,y,g,i,c}], ...}
+let IMPORTS=load("sd_imports",[]);           // [{id,name,songs}]
+const CFG=Object.assign({on:{},genre:"All",era:"All"},load("sd_cfg",{}));
+let YEARFIX=load("sd_years",{});
+
+function allLists(){return[...Object.keys(BUILTIN).map(n=>({id:"b:"+n,name:n,songs:BUILTIN[n],builtin:true})),...IMPORTS.map(x=>({id:"u:"+x.id,name:x.name,songs:x.songs}))]}
+function listOn(id){return CFG.on[id]!==undefined?CFG.on[id]:id==="b:Charts"}
+function ensureOneOn(){const L=allLists();if(L.length&&!L.some(l=>listOn(l.id)))CFG.on[L[0].id]=true}
+
+/* Matching helpers (from Yahyadle's Songdle) */
+const nrm=x=>String(x||"").normalize("NFKD").replace(/[̀-ͯ]/g,"").toLowerCase();
+const SPLIT=/\s*(?:&|,|;|\bx\b|\bfeat\.?|\bft\.?|\bwith\b|\band\b)\s*/;
+const mainArtist=a=>nrm(a).split(SPLIT)[0].replace(/^the\s+/,"").replace(/[^\p{L}\p{N}]+/gu," ").trim();
+const artistSet=(a,t)=>{const ft=(nrm(t).match(/[(\[]\s*(?:feat|ft|with)\.?\s+([^)\]]+)[)\]]/)||[])[1]||"";
+  return new Set((nrm(a)+(ft?", "+ft:"")).split(SPLIT).map(x=>x.replace(/^the\s+/,"").replace(/[^\p{L}\p{N}$]+/gu," ").trim()).filter(Boolean))};
+// Artist box: green = main artist matches, orange = they share a credited artist, red = none
+function artistMatch(g,t){if(mainArtist(g.a)===mainArtist(t.a))return"hit";const A=artistSet(g.a,g.t),B=artistSet(t.a,t.t);return[...A].some(x=>B.has(x))?"near":"miss"}
+const songKey=(t,a)=>{const k=x=>x.replace(/[^\p{L}\p{N}]+/gu," ").trim();
+  const title=nrm(t).replace(/\s*[(\[][^)\]]*\b(feat|ft|with|remaster(ed)?|explicit|clean|radio edit|single version|album version)\b[^)\]]*[)\]]/g,"")
+    .replace(/\s+-\s+.*\b(remaster(ed)?|radio edit|single version|album version|explicit)\b.*$/,"").replace(/\s+(feat|ft)\.?\s.*$/,"");
+  return k(title)+"|"+mainArtist(a)};
+
+let srcCache=null;
+function songSource(){
+  const sig=JSON.stringify(CFG.on)+IMPORTS.length+Object.keys(BUILTIN).length;if(srcCache&&srcCache.sig===sig)return srcCache.out;
+  const m=new Map();
+  for(const L of allLists()){if(!listOn(L.id))continue;for(const r of L.songs){const k=songKey(r.t,r.a),o=m.get(k);
+    if(!o){const f=YEARFIX[k];let y=+r.y||0;if(f&&(!y||f<y))y=f;m.set(k,{k,t:r.t,a:r.a,y,g:r.g||"",i:r.i||0,c:r.c||"",lists:[L.name]});continue}
+    if(!o.i&&r.i){o.i=r.i;o.c=r.c||""}if(!o.lists.includes(L.name))o.lists.push(L.name);if(+r.y&&(!o.y||+r.y<o.y))o.y=+r.y;if(!o.g&&r.g)o.g=r.g}}
+  const out=[...m.values()];srcCache={sig,out};return out}
+function songPool(){const e=ERAS.find(x=>x[0]===CFG.era)||ERAS[0];
+  return songSource().filter(x=>(CFG.genre==="All"||x.g===CFG.genre)&&(e[0]==="All"||(x.y>=e[1]&&x.y<=e[2])))}
+function applyYear(song,info){const y=info&&info.year;if(!y||(song.y&&song.y<=y))return false;song.y=y;YEARFIX[song.k]=y;save("sd_years",YEARFIX);return true}
+
+/* ---------- iTunes previews (JSONP, from Yahyadle) ---------- */
+const prevCache={};
+function jsonp(url){return new Promise((res,rej)=>{const cb="__jp"+Math.random().toString(36).slice(2);const sc=document.createElement("script");const t=setTimeout(()=>{cleanup();rej(new Error("timeout"))},9000);
+  function cleanup(){clearTimeout(t);delete window[cb];sc.remove()}window[cb]=d=>{cleanup();res(d)};sc.src=url+(url.includes("?")?"&":"?")+"callback="+cb;sc.onerror=()=>{cleanup();rej(new Error("blocked"))};document.head.appendChild(sc)})}
+const clean=s=>String(s).toLowerCase().replace(/\(.*?\)|\[.*?\]|feat\..*$/g,"").replace(/[^\p{L}\p{N}]+/gu," ").trim();
+const VARIANT=/\b(remix|edit|mix|version|slowed|sped|nightcore|live|acoustic|instrumental|cover|karaoke|rework|bootleg|vip|flip|mashup)\b/i;
+const FAKE=/karaoke|tribute|made famous|in the style of|originally performed|backing track|lullaby|8[- ]bit|music box|cover version|covers?\b|vitamin string|rockabye baby|twinkle twinkle|piano version|sped up|slowed/i;
+async function findPreview(song){
+  if(song.k in prevCache)return prevCache[song.k];
+  const art=r=>(r.artworkUrl100||"").replace("100x100","300x300");
+  if(song.i){try{const d=await jsonp("https://itunes.apple.com/lookup?id="+song.i+"&country="+(song.c||"US"));const r=(d.results||[]).find(x=>x.previewUrl);
+    if(r)return prevCache[song.k]={url:r.previewUrl,art:art(r),link:r.trackViewUrl,year:0}}catch(e){}}
+  const own=VARIANT.test(song.t)||FAKE.test(song.t),variant=n=>!own&&VARIANT.test(n);
+  const who=[...artistSet(song.a,song.t)].map(clean).filter(x=>x.length>1);
+  const byArtist=x=>{const an=clean(x.artistName);return who.some(w=>an.includes(w)||(an.length>2&&w.includes(an)))};
+  const genuine=x=>own||!(variant(x.trackName)||FAKE.test(x.trackName+" | "+x.artistName+" | "+(x.collectionName||"")));
+  const oldest=L=>L.slice().sort((p,q)=>String(p.releaseDate||"9").localeCompare(String(q.releaseDate||"9")))[0]||null;
+  const t=clean(song.t);let best=null;const yrs=[];
+  for(const country of ["US","GB"]){
+    const d=await jsonp("https://itunes.apple.com/search?media=music&entity=song&limit=50&country="+country+"&term="+encodeURIComponent(song.a+" "+song.t));
+    const all=(d.results||[]).filter(x=>byArtist(x)&&genuine(x)),r=all.filter(x=>x.previewUrl);
+    yrs.push(...all.filter(x=>(clean(x.trackName)===t||clean(x.trackName).startsWith(t+" "))&&x.releaseDate).map(x=>+String(x.releaseDate).slice(0,4)).filter(y=>y>1900));
+    best=oldest(r.filter(x=>clean(x.trackName)===t))||oldest(r.filter(x=>clean(x.trackName).startsWith(t+" ")))||null;
+    if(best)break}
+  const year=yrs.length?Math.min(...yrs):0;
+  return prevCache[song.k]=best?{url:best.previewUrl,art:art(best),link:best.trackViewUrl,year}:null}
+
+/* ---------- Stats ---------- */
+const STATS=Object.assign({w:0,streak:0,best:0},load("sd_stats",{}));
+function bump(won){if(won){STATS.w++;STATS.streak++;STATS.best=Math.max(STATS.best,STATS.streak)}else STATS.streak=0;save("sd_stats",STATS)}
+const DSTATS=Object.assign({w:0,streak:0,best:0,last:""},load("sd_dstats",{}));
+
+/* ---------- Daily ---------- */
+const today=()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")};
+function hash(s){let h=2166136261;for(const c of s){h^=c.charCodeAt(0);h=Math.imul(h,16777619)}return h>>>0}
+// Same song for everyone: picked from the Charts list (songs with a saved iTunes ID), whatever lists are switched on
+function dailySong(date){const C=(BUILTIN.Charts||[]).filter(r=>r.i);if(!C.length)return null;const r=C[hash("songdle"+date)%C.length];
+  const k=songKey(r.t,r.a);return{k,t:r.t,a:r.a,y:+r.y||0,g:r.g||"",i:r.i,c:r.c||"",lists:["Charts"]}}
+function dailyState(){const d=today(),s=load("sd_daily",null);if(s&&s.date===d)return s;return{date:d,guesses:[],done:false,won:false,daily:true}}
+function dailyFinish(st){const d=st.date;if(DSTATS.last===d)return;const y=new Date(d);y.setDate(y.getDate()-1);
+  const yd=y.getFullYear()+"-"+String(y.getMonth()+1).padStart(2,"0")+"-"+String(y.getDate()).padStart(2,"0");
+  if(st.won){DSTATS.w++;DSTATS.streak=DSTATS.lastWin===yd?DSTATS.streak+1:1;DSTATS.best=Math.max(DSTATS.best,DSTATS.streak);DSTATS.lastWin=d}else DSTATS.streak=0;
+  DSTATS.last=d;save("sd_dstats",DSTATS)}
+function shareText(st,t){const sq=st.guesses.map(g=>g.skip?"⬛":g.k===t.k?"🟩":artistMatch(g,t)!=="miss"?"🟧":"🟥").join("");
+  return`Songdle ${st.date}\n${sq}${"⬜".repeat(Math.max(0,CLIPS.length-st.guesses.length))}\n${st.won?"Got it in "+st.guesses.length+"/5":"Didn't get it"}`}
+
+/* ---------- Audio ---------- */
+let audio=null,timer=null,raf=0,ctx=null;
+let vol=load("sd_vol",0.8);if(!(vol>=0&&vol<=1))vol=0.8;
+const preAudio={};
+function stop(){if(timer){clearTimeout(timer);timer=null}cancelAnimationFrame(raf);if(audio)audio.pause();const b=$("#play");if(b){b.classList.remove("playing");b.setAttribute("aria-label","Play")}draw()}
+function draw(){const tr=$("#track");if(!tr||!ctx)return;const t=audio&&!audio.paused?Math.min(audio.currentTime,ctx.limit):0;
+  tr.querySelector(".open").style.width=ctx.limit/ctx.total*100+"%";tr.querySelector(".fill").style.width=t/ctx.total*100+"%"}
+function play(){if(!audio||!ctx)return;stop();const c=ctx;try{audio.currentTime=0}catch(e){}
+  const b=$("#play");if(b){b.classList.add("playing");b.setAttribute("aria-label","Pause")}
+  const end=()=>{if(ctx!==c)return;stop()};
+  const tick=()=>{if(!audio||audio.paused||ctx!==c)return;if(audio.currentTime>=c.limit)return end();draw();raf=requestAnimationFrame(tick)};
+  audio.onended=end;
+  Promise.resolve(audio.play()).then(()=>{if(ctx!==c||audio.paused)return;timer=setTimeout(end,Math.max(0,(c.limit-audio.currentTime)*1000));raf=requestAnimationFrame(tick)}).catch(()=>stop())}
+
+/* ---------- Game ---------- */
+let tab=load("sd_tab","play");if(!["play","daily","list"].includes(tab))tab="play";
+let round=null,nextSong=null,lastAns="";
+function pick(pool){const recent=load("sd_recent",[]);let c=pool.filter(x=>!recent.includes(x.k));if(!c.length)c=pool;
+  const s=c[Math.floor(Math.random()*c.length)];recent.push(s.k);while(recent.length>Math.min(150,Math.floor(pool.length*0.6)))recent.shift();save("sd_recent",recent);return s}
+function newRound(){const pool=songPool();let t=nextSong&&pool.find(x=>x.k===nextSong.k);nextSong=null;return{target:t||(pool.length?pick(pool):null),guesses:[],done:false,won:false}}
+function prefetch(){if(nextSong)return;const pool=songPool();if(pool.length<2)return;nextSong=pick(pool);
+  findPreview(nextSong).then(p=>{if(!p||preAudio[p.url])return;const ks=Object.keys(preAudio);if(ks.length>=3)delete preAudio[ks[0]];const a=new Audio(p.url);a.preload="auto";preAudio[p.url]=a}).catch(()=>{})}
+
+function render(){stop();ctx=null;document.querySelectorAll("nav button").forEach(b=>b.setAttribute("aria-selected",b.dataset.tab===tab));
+  if(tab==="list")return renderList();
+  if(!Object.keys(BUILTIN).length&&!IMPORTS.length){$("#stage").innerHTML=`<p class="status">Loading songs…</p>`;return}
+  if(tab==="daily"){const st=dailyState();st.target=dailySong(st.date);return renderGame(st)}
+  if(!round)round=newRound();renderGame(round)}
+
+function chips(daily){const s=daily?DSTATS:STATS;return`<div class="chips"><span class="chip">🔥 Streak ${s.streak}</span><span class="chip">Best ${s.best}</span><span class="chip">Wins ${s.w}</span></div>`}
+
+function renderGame(st){
+  const t=st.target,daily=!!st.daily;let h=chips(daily);
+  if(daily)h+=`<p class="status" style="margin-bottom:12px">Today's song: the same for everyone on ${new Date().toLocaleDateString(undefined,{weekday:"long",day:"numeric",month:"long"})}</p>`;
+  else{const genres=["All",...[...new Set(songSource().map(x=>x.g).filter(Boolean))].sort()];
+    h+=`<div class="filters"><label>Type <select id="genre">${genres.map(g=>`<option${CFG.genre===g?" selected":""}>${esc(g)}</option>`).join("")}</select></label>
+      <label>Era <select id="era">${ERAS.map(e=>`<option value="${e[0]}"${CFG.era===e[0]?" selected":""}>${e[0]}</option>`).join("")}</select></label></div>`}
+  if(!t){h+=`<p class="note">No songs match these choices. Try a different type or era, or switch more lists on in Settings ⚙️.</p>`;$("#stage").innerHTML=h;wireFilters();return}
+  const step=Math.min(st.guesses.length,CLIPS.length-1),len=CLIPS[step];
+  const total=st.done?30:CLIPS[CLIPS.length-1],limit=st.done?30:len;ctx={limit,total};
+  h+=`<div class="player"><div class="controls"><div class="side">${st.done?"":`<button class="btn skip" id="skip">Skip<small>hear ${CLIPS[Math.min(step+1,CLIPS.length-1)]}s</small></button>`}</div>
+    <button class="play" id="play" aria-label="Play" disabled><svg class="i-play" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg><svg class="i-pause" viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg></button>
+    <div class="side">${st.done||daily?"":`<button class="btn" id="giveup">Give up</button>`}</div></div>
+    <div class="track" id="track" aria-hidden="true"><div class="open"></div><div class="fill"></div>${st.done?"":CLIPS.slice(0,-1).map(c=>`<i style="left:${c/total*100}%"></i>`).join("")}</div>
+    <p class="status" id="status" role="status">Loading the song…</p>
+    <label class="vol">🔈<span class="sr">Volume</span><input type="range" id="vol" min="0" max="100" value="${Math.round(vol*100)}" aria-label="Volume">🔊</label></div>`;
+  if(st.done){const won=st.won;
+    h+=`<div class="result${won?"":" lose"}"><img id="art" alt="" hidden><div><h2>${won?"🎉 Well done!":"The answer was"}</h2><p><b>${esc(t.t)}</b></p><p>${esc(t.a)} · ${t.y||"?"}</p>
+      ${won?`<p>You got it after ${CLIPS[Math.min(st.guesses.length-1,CLIPS.length-1)]} second${st.guesses.length===1?"":"s"} of music.</p>`:""}
+      <div class="actions">${daily?`<button class="btn primary" id="share">Copy my score</button>`:`<button class="btn primary" id="next">Next song</button>`}</div>
+      ${daily?`<p id="sharemsg" role="status"></p><p>Come back tomorrow for a new song.</p>`:""}</div></div>`}
+  else h+=`<div class="guessbar"><div class="search"><label for="guess" class="sr">Your guess</label><input type="search" id="guess" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="Type the song name…" role="combobox" aria-expanded="false" aria-controls="sugg"><ul class="sugg" id="sugg" role="listbox" hidden></ul></div>
+     ${daily?`<button class="btn" id="giveup">Give up</button>`:""}</div>
+    <p class="left">${CLIPS.length-st.guesses.length} ${CLIPS.length-st.guesses.length===1?"try":"tries"} left</p>`;
+  h+=`<div class="rows">`+st.guesses.slice().reverse().map(g=>{if(g.skip)return`<div class="row"><span class="skipped">Skipped</span></div>`;
+    const ya=!g.y||!t.y||g.y===t.y?"":t.y>g.y?" ▲ newer":" ▼ older";
+    return`<div class="row"><span class="${g.k===t.k?"hit":"miss"}"><small>Song</small>${esc(g.t)}</span><span class="${artistMatch(g,t)}"><small>Artist</small>${esc(g.a)}</span><span class="${g.y&&g.y===t.y?"hit":"miss"}"><small>Year</small>${g.y||"?"}${ya}</span></div>`}).join("")+`</div>`;
+  if(st.guesses.some(g=>!g.skip))h+=`<div class="legend"><span><b style="background:var(--hit)"></b>Right</span><span><b style="background:var(--near)"></b>A singer is right</span><span><b style="background:var(--miss)"></b>Wrong</span></div>`;
+  if(lastAns&&!daily)h+=`<p class="prev">Last song was <b>${esc(lastAns)}</b></p>`;
+  $("#stage").innerHTML=h;wireFilters();draw();
+
+  const status=$("#status"),pb=$("#play");
+  const finish=won=>{st.done=true;st.won=won;if(daily){dailyFinish(st);saveDaily(st)}else bump(won)};
+  findPreview(t).then(p=>{if(!$("#play")||pb!==$("#play"))return;
+    if(p&&!daily&&applyYear(t,p)){render();return}
+    if(!p){// No clip: quietly deal another before anyone has guessed
+      if(!daily&&st===round&&!st.done&&!st.guesses.length&&(st.auto||0)<6){const n=newRound();n.auto=(st.auto||0)+1;round=n;render();return}
+      status.textContent=st.done?"No music found for this song.":"Sorry, no music found for this song."+(daily?"":" Press Give up for another.");return}
+    audio=preAudio[p.url]||(audio&&audio.src===p.url?audio:new Audio(p.url));delete preAudio[p.url];audio.preload="auto";audio.volume=vol;pb.disabled=false;
+    status.textContent=st.done?"Press play to hear the song":"Press play to hear "+len+(len===1?" second":" seconds");
+    if(!st.done&&!daily)(audio.readyState>=3?setTimeout(prefetch,300):audio.addEventListener("canplaythrough",prefetch,{once:true}));
+    if(st.done){const a=$("#art");if(a&&p.art){a.src=p.art;a.hidden=false}
+      if(st.won&&!st.autoplayed){st.autoplayed=true;if(daily)saveDaily(st);status.textContent="Playing the song";play()}}
+  }).catch(()=>{status.textContent="Couldn't reach Apple Music. Check the internet connection and try again."});
+  pb.onclick=()=>{if(audio&&!audio.paused)stop();else play()};
+  $("#vol").oninput=e=>{vol=e.target.value/100;if(audio)audio.volume=vol;save("sd_vol",vol)};
+  const nx=$("#next");if(nx)nx.onclick=()=>{lastAns=t.t+" — "+t.a;round=newRound();render()};
+  const sh=$("#share");if(sh)sh.onclick=async()=>{const txt=shareText(st,t);let ok=false;
+    try{if(navigator.share){await navigator.share({text:txt});ok=true}}catch(e){if(e&&e.name==="AbortError")return}
+    if(!ok)try{await navigator.clipboard.writeText(txt);ok=true}catch(e){}
+    $("#sharemsg").innerHTML=ok?"Copied. Paste it into a message.":`<span class="share">${esc(txt)}</span>`};
+  const gu=$("#giveup");if(gu)gu.onclick=()=>{finish(false);render()};
+  if(st.done)return;
+  const after=()=>{if(st.guesses.length>=CLIPS.length&&!st.done)finish(false);if(daily)saveDaily(st);render();if(!st.done){const g=$("#guess");if(g&&!matchMedia("(pointer:coarse)").matches)g.focus()}};
+  $("#skip").onclick=()=>{st.guesses.push({skip:1});after()};
+  // Guess from every switched-on song (always including the answer)
+  const pool=songSource().slice();if(!pool.some(x=>x.k===t.k))pool.push(t);
+  const used=new Set(st.guesses.map(g=>g.k));
+  wireSearch(pool.filter(x=>!used.has(x.k)),g=>{st.guesses.push({k:g.k,t:g.t,a:g.a,y:g.y});if(g.k===t.k)finish(true);after();
+    if(!g.i)findPreview(g).then(info=>{if(applyYear(g,info)){const s=st.guesses.find(x=>x.k===g.k);if(s)s.y=g.y;if(daily)saveDaily(st);render()}}).catch(()=>{})});
+}
+function saveDaily(st){const {target,...rest}=st;save("sd_daily",rest)}
+function wireFilters(){const g=$("#genre"),e=$("#era");if(!g)return;
+  g.onchange=()=>{CFG.genre=g.value;save("sd_cfg",CFG);round=null;nextSong=null;render()};
+  e.onchange=()=>{CFG.era=e.value;save("sd_cfg",CFG);round=null;nextSong=null;render()}}
+
+function wireSearch(pool,onPick){
+  const inp=$("#guess"),ul=$("#sugg");let items=[],sel=0;
+  const show=()=>{const q=clean(inp.value);if(!q){ul.hidden=true;inp.setAttribute("aria-expanded","false");return}
+    const words=q.split(" ");
+    items=pool.map(x=>{const n=clean(x.t);const s=n.startsWith(q)?0:n.includes(q)?1:words.every(w=>n.includes(w)||clean(x.a).includes(w))?2:9;return[s,x]}).filter(x=>x[0]<9)
+      .sort((a,b)=>a[0]-b[0]||a[1].t.localeCompare(b[1].t)).slice(0,8).map(x=>x[1]);sel=0;
+    ul.innerHTML=items.length?items.map((x,i)=>`<li role="option" id="o${i}" data-i="${i}" aria-selected="${i===sel}">${esc(x.t)}<small>${esc(x.a)}</small></li>`).join(""):`<li aria-disabled="true">No song with that name in the list</li>`;
+    ul.hidden=false;inp.setAttribute("aria-expanded","true")};
+  inp.oninput=show;
+  inp.onkeydown=e=>{if(ul.hidden||!items.length)return;
+    if(e.key==="ArrowDown"||e.key==="ArrowUp"){e.preventDefault();sel=(sel+(e.key==="ArrowDown"?1:items.length-1))%items.length;
+      ul.querySelectorAll("li").forEach((l,i)=>l.setAttribute("aria-selected",i===sel));inp.setAttribute("aria-activedescendant","o"+sel)}
+    else if(e.key==="Enter"){e.preventDefault();onPick(items[sel])}
+    else if(e.key==="Escape")ul.hidden=true};
+  ul.onclick=e=>{const li=e.target.closest("li[data-i]");if(li)onPick(items[+li.dataset.i])};
+}
+
+/* ---------- Song list ---------- */
+const LV={q:"",genre:"All",era:"All"};
+function renderList(){const genres=["All",...[...new Set(songSource().map(x=>x.g).filter(Boolean))].sort()];
+  $("#stage").innerHTML=`<div class="listtools"><label class="sr" for="lq">Search</label><input type="search" id="lq" placeholder="Search songs or singers" value="${esc(LV.q)}">
+   <select id="lg" aria-label="Type">${genres.map(g=>`<option${LV.genre===g?" selected":""}>${esc(g)}</option>`).join("")}</select>
+   <select id="le" aria-label="Era">${ERAS.map(e=>`<option value="${e[0]}"${LV.era===e[0]?" selected":""}>${e[0]==="All"?"All eras":e[0]}</option>`).join("")}</select></div>
+   <p id="lcount" class="status"></p><div style="overflow:auto"><table><thead><tr><th>Song</th><th>Artist</th><th>Year</th><th>Type</th></tr></thead><tbody id="lbody"></tbody></table></div>`;
+  const fill=()=>{const e=ERAS.find(x=>x[0]===LV.era)||ERAS[0],q=clean(LV.q);
+    const rows=songSource().filter(x=>(LV.genre==="All"||x.g===LV.genre)&&(e[0]==="All"||(x.y>=e[1]&&x.y<=e[2]))&&(!q||clean(x.t+" "+x.a).includes(q))).sort((a,b)=>a.t.localeCompare(b.t));
+    $("#lcount").textContent=rows.length+" song"+(rows.length===1?"":"s");
+    $("#lbody").innerHTML=rows.map(x=>`<tr><td>${esc(x.t)}${allLists().filter(l=>listOn(l.id)).length>1?`<br><small>${esc(x.lists.join(", "))}</small>`:""}</td><td>${esc(x.a)}</td><td>${x.y||"?"}</td><td>${esc(x.g||"—")}</td></tr>`).join("")};
+  $("#lq").oninput=e=>{LV.q=e.target.value;fill()};$("#lg").onchange=e=>{LV.genre=e.target.value;fill()};$("#le").onchange=e=>{LV.era=e.target.value;fill()};fill()}
+
+/* ---------- Settings & CSV import ---------- */
+// "Future;Juice WRLD" -> "Future & Juice WRLD" (keeps every credited artist; commas only split when there's no ";")
+function joinArtists(s){const A=String(s).split(String(s).includes(";")?/\s*;\s*/:/\s*\|\s*/).map(x=>x.trim()).filter(Boolean);return A.length>1?A.slice(0,-1).join(", ")+" & "+A[A.length-1]:(A[0]||"")}
+function parseCSV(text){
+  const rows=[];let row=[],f="",q=false;for(let i=0;i<text.length;i++){const c=text[i];
+    if(q){if(c==='"'){if(text[i+1]==='"'){f+='"';i++}else q=false}else f+=c}
+    else if(c==='"')q=true;else if(c===","){row.push(f);f=""}else if(c==="\n"||c==="\r"){if(c==="\r"&&text[i+1]==="\n")i++;row.push(f);rows.push(row);row=[];f=""}else f+=c}
+  if(f||row.length){row.push(f);rows.push(row)}
+  if(rows.length<2)return[];const H=rows[0].map(x=>x.replace(/^﻿/,"").toLowerCase().trim());
+  const col=(...k)=>H.findIndex(h=>k.some(x=>h.includes(x)));
+  const ti=col("track name","title","song","name"),ai=col("artist"),yi=col("release date","year","date"),gi=col("genre");
+  if(ti<0||ai<0)return[];
+  return rows.slice(1).filter(r=>r[ti]&&r[ai]).map(r=>({t:r[ti].trim(),a:joinArtists(r[ai]),y:yi>=0?parseInt(r[yi])||0:0,g:gi>=0&&r[gi]?r[gi].split(/[;,]/)[0].trim().replace(/\b\w/g,m=>m.toUpperCase()):""}));
+}
+function changed(){ensureOneOn();save("sd_cfg",CFG);srcCache=null;round=null;nextSong=null;renderSettings();render()}
+function renderSettings(){ensureOneOn();const L=allLists(),onCount=L.filter(l=>listOn(l.id)).length;
+  $("#lists").innerHTML=L.map(l=>`<div class="switch"><label style="display:flex;gap:12px;align-items:center;flex:1"><input type="checkbox" data-id="${esc(l.id)}"${listOn(l.id)?" checked":""}${listOn(l.id)&&onCount===1?" disabled":""}>
+    <span><b>${esc(l.name)}</b><br><small>${l.songs.length} songs${l.builtin?"":" · on this device"}</small></span></label>${l.builtin?"":`<button class="btn x" data-del="${esc(l.id)}">Remove</button>`}</div>`).join("")+
+    (onCount===1?`<p><small>At least one list always stays on.</small></p>`:"");
+  $("#lists").querySelectorAll("input").forEach(c=>c.onchange=()=>{CFG.on[c.dataset.id]=c.checked;changed()});
+  $("#lists").querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>{const id=b.dataset.del;if(!confirm("Remove this list from this device?"))return;
+    IMPORTS=IMPORTS.filter(x=>"u:"+x.id!==id);delete CFG.on[id];save("sd_imports",IMPORTS);changed()})}
+$("#imp-file").onchange=e=>{const file=e.target.files[0];if(!file)return;const r=new FileReader();
+  r.onload=()=>{const songs=parseCSV(String(r.result));e.target.value="";
+    if(!songs.length){$("#imp-msg").textContent="Sorry, that file doesn't look like a playlist. It needs song names and artists.";return}
+    const name=$("#imp-name").value.trim()||file.name.replace(/\.csv$/i,"");const id=Date.now().toString(36);
+    IMPORTS.push({id,name,songs});CFG.on["u:"+id]=true;save("sd_imports",IMPORTS);CFG.genre="All";$("#imp-name").value="";
+    changed();$("#imp-msg").textContent=`Added "${name}" with ${songs.length} songs.`};
+  r.readAsText(file)};
+
+/* ---------- Start ---------- */
+document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{tab=b.dataset.tab;save("sd_tab",tab);render()});
+$("#gear").onclick=()=>{renderSettings();$("#imp-msg").textContent="";$("#settings").showModal()};
+$("#set-ok").onclick=()=>$("#settings").close();
+$("#help").onclick=()=>$("#how").showModal();
+$("#how-ok").onclick=()=>{$("#how").close();save("sd_seenhow",1)};
+$("#how").addEventListener("close",()=>save("sd_seenhow",1));
+if(!load("sd_seenhow",0))$("#how").showModal();
+render();
+fetch("playlists.json",{cache:"no-cache"}).then(r=>r.json()).then(p=>{BUILTIN=p;srcCache=null;ensureOneOn();if(!round||!round.target)round=null;render()})
+  .catch(()=>{$("#stage").innerHTML=`<p class="note">Couldn't load the song list. Please check the internet connection and reload the page.</p>`});
+</script>
+</body>
+</html>
