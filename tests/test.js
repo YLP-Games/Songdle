@@ -44,25 +44,25 @@ async function stub(page, opts = {}) {
     await page.waitForTimeout(400);
     ok(await page.evaluate(() => audio && audio.paused), "0.1s clip stops by itself");
     await page.click("#skip");
-    ok((await page.textContent(".left")).includes("4 tries"), "Skip uses a try");
-    ok(await page.isVisible(".row .skipped"), "Skipped row shown");
+    ok((await page.textContent(".left")).includes("4 guesses"), "Skip uses a try");
+    ok((await page.textContent(".sg-row")).includes("Skipped"), "Skipped row shown");
     // Wrong guess: pick a song by a different artist
     const wrong = await page.evaluate(k => songSource().find(x => x.k !== k && mainArtist(x.a) !== mainArtist(round.target.a) && x.y && x.y !== round.target.y), t.k);
     await page.fill("#guess", wrong.t);
     await page.waitForSelector("#sugg li[data-i]");
     const idx = await page.$$eval("#sugg li[data-i]", (ls, w) => ls.findIndex(l => l.textContent === w.t + w.a), wrong);
     await page.click(`#sugg li[data-i="${Math.max(0, idx)}"]`);
-    const cells = await page.$$eval(".row:first-child span", s => s.map(x => x.className + ":" + x.textContent));
+    const cells = await page.$$eval(".sg-row:first-child span", s => s.map(x => x.className + ":" + x.textContent));
     ok(cells[0].startsWith("miss") && cells.length === 3, "Wrong guess shows Song/Artist/Year boxes: " + cells.join(" | "));
-    ok(/▲ newer|▼ older/.test(cells[2]) && ((t.y > wrong.y) === cells[2].includes("▲")), "Year arrow points the right way");
+    ok(/▲|▼/.test(cells[2]) && ((t.y > wrong.y) === cells[2].includes("▲")), "Year arrow points the right way");
     // Correct guess
     await page.fill("#guess", t.t);
     await page.waitForSelector("#sugg li[data-i]");
     const ci = await page.$$eval("#sugg li[data-i]", (ls, w) => ls.findIndex(l => l.textContent === w.t + w.a), t);
     ok(ci >= 0, "Answer appears in the dropdown");
     await page.click(`#sugg li[data-i="${ci}"]`);
-    await page.waitForSelector(".result");
-    ok((await page.textContent(".result h2")).includes("Well done"), "Win screen shows");
+    await page.waitForSelector(".win");
+    ok((await page.getAttribute(".win","class"))==="win", "Win screen shows");
     await page.waitForTimeout(500);
     ok(await page.evaluate(() => audio && !audio.paused), "Full preview autoplays after a win");
     ok((await page.textContent(".chips")).includes("Streak 1"), "Streak counts the win");
@@ -70,7 +70,7 @@ async function stub(page, opts = {}) {
     await page.waitForSelector("#play:not([disabled])");
     ok((await page.textContent(".prev")).includes(t.t), "Next song deals a new round");
     await page.click("#giveup");
-    ok((await page.textContent(".result h2")).includes("answer was") && (await page.textContent(".chips")).includes("Streak 0") && (await page.textContent(".chips")).includes("Best 1"), "Give up shows answer and resets streak");
+    ok((await page.getAttribute(".win","class")).includes("lose") && (await page.textContent(".chips")).includes("Streak 0") && (await page.textContent(".chips")).includes("Best 1"), "Give up shows answer and resets streak");
     // Volume remembered
     await page.$eval("#vol", e => { e.value = 35; e.dispatchEvent(new Event("input")) });
     // Era filter
@@ -87,15 +87,15 @@ async function stub(page, opts = {}) {
 
     // ---------- Settings: import CSV, list switches ----------
     await page.click("#gear");
-    ok(await page.isDisabled('#lists input[data-id="b:Charts"]'), "Only list can't be switched off");
+    ok(await page.isDisabled('#lists [data-id="b:Charts"]'), "Only list can't be switched off");
     const csv = 'Track Name,Artist Name(s),Release Date,Genres\n"Running Up That Hill (A Deal with God)",Kate Bush,1985-09-16,"art pop,rock"\n"Under Pressure","Queen;David Bowie",1981,rock\n';
     await page.fill("#imp-name", "Mum's songs");
     await page.setInputFiles("#imp-file", { name: "mum.csv", mimeType: "text/csv", buffer: Buffer.from(csv) });
     await page.waitForFunction(() => document.querySelector("#imp-msg").textContent.includes("Added"));
     ok((await page.textContent("#imp-msg")).includes("2 songs"), "CSV import adds 2 songs");
     ok(await page.evaluate(() => songSource().some(x => x.a === "Queen & David Bowie")), "Every credited artist kept");
-    await page.uncheck('#lists input[data-id="b:Charts"]');
-    ok(await page.isDisabled('#lists input[data-id^="u:"]'), "Imported list now the one that stays on");
+    await page.click('#lists [data-id="b:Charts"]');
+    ok(await page.isDisabled('#lists .sopt[data-id^="u:"]'), "Imported list now the one that stays on");
     await page.click("#set-ok");
     await page.selectOption("#era", "All"); await page.selectOption("#genre", "All");
     const imported = await page.evaluate(() => songSource().length);
@@ -105,15 +105,15 @@ async function stub(page, opts = {}) {
     ok(await page.evaluate(() => songSource().length === 2 && vol === 0.35), "Import, switches and volume survive a reload");
 
     // ---------- Song list ----------
-    await page.click('nav [data-tab="list"]');
+    await page.click('.tab[data-tab="list"]');
     ok((await page.textContent("#lcount")) === "2 songs", "Song list shows switched-on songs");
-    await page.click("#gear"); await page.check('#lists input[data-id="b:Charts"]'); await page.click("#set-ok");
-    await page.click('nav [data-tab="list"]');
+    await page.click("#gear"); await page.click('#lists [data-id="b:Charts"]'); await page.click("#set-ok");
+    await page.click('.tab[data-tab="list"]');
     await page.fill("#lq", "billie jean");
     ok((await page.textContent("#lcount")) === "1 song", "Song list search works");
 
     // ---------- Daily ----------
-    await page.click('nav [data-tab="daily"]');
+    await page.click('.tab[data-tab="daily"]');
     await page.waitForSelector("#play:not([disabled])");
     const d1 = await page.evaluate(() => dailySong(today()).k);
     await page.click("#skip"); await page.click("#giveup");
@@ -122,7 +122,7 @@ async function stub(page, opts = {}) {
     await page.click("#share");
     await page.waitForTimeout(200);
     ok(/⬛/.test(await page.evaluate(() => shareText(dailyState(), dailySong(today())))), "Score text has squares");
-    await page.reload(); await page.click('nav [data-tab="daily"]');
+    await page.reload(); await page.click('.tab[data-tab="daily"]');
     ok(await page.isVisible("#share"), "Daily result kept after reload");
     const page2 = await browser.newPage(); await stub(page2); await page2.goto("http://localhost:8123/");
     await page2.waitForFunction(() => Object.keys(BUILTIN).length);
