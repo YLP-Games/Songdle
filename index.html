@@ -400,11 +400,11 @@ function wireFilters(){const g=$("#genre"),e=$("#era");if(!g)return;
 function wireSearch(pool,onPick){
   const inp=$("#guess"),ul=$("#sugg");let items=[],sel=0;
   // Search the whole title, brackets included ("shoop shoop" finds "Exhale (Shoop Shoop)"), ignoring accents and punctuation
-  const sk=x=>nrm(x).replace(/['’]/g,"").replace(/[^\p{L}\p{N}]+/gu," ").trim();
+  const sk=x=>nrm(x).replace(/['’.]/g,"").replace(/[^\p{L}\p{N}]+/gu," ").trim();
   for(const x of pool)if(!x._s){x._s=sk(x.t);x._a=sk(x.a)}
   const show=()=>{const q=sk(inp.value);if(!q){ul.hidden=true;inp.setAttribute("aria-expanded","false");return}
     const words=q.split(" ");
-    items=pool.map(x=>{const n=x._s;const s=n===q?0:n.startsWith(q)?1:(" "+n).includes(" "+q)?2:n.includes(q)?3:words.every(w=>n.includes(w)||x._a.includes(w))?4:9;return[s,x]}).filter(x=>x[0]<9)
+    items=pool.map(x=>{const n=x._s;const s=n===q?0:n.startsWith(q)?1:(" "+n).includes(" "+q)?2:n.includes(q)?3:words.every(w=>n.includes(w)||x._a.includes(w))?4:n.replace(/ /g,"").includes(q.replace(/ /g,""))?5:9;return[s,x]}).filter(x=>x[0]<9)
       .sort((a,b)=>a[0]-b[0]||a[1].t.localeCompare(b[1].t)).slice(0,8).map(x=>x[1]);sel=0;
     ul.innerHTML=items.length?items.map((x,i)=>`<li role="option" id="o${i}" data-i="${i}" aria-selected="${i===sel}">${esc(x.t)}<small>${esc(x.a)}</small></li>`).join(""):`<li aria-disabled="true">No song with that name in the list</li>`;
     ul.hidden=false;inp.setAttribute("aria-expanded","true")};

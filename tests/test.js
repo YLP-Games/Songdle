@@ -173,7 +173,7 @@ async function stub(page, opts = {}) {
     ok(pr && pr.url === "orig" && pr.year === 2015, "Search picks the earliest original recording");
 
     // ---------- Search finds words anywhere in the title ----------
-    for (const [q, want] of [["shoop shoop", "Exhale (Shoop Shoop)"], ["dont stop", "Don't Stop Believin'"], ["pina colada", "Escape (The Piña Colada Song)"]]) {
+    for (const [q, want] of [["shoop shoop", "Exhale (Shoop Shoop)"], ["dont stop", "Don't Stop Believin'"], ["pina colada", "Escape (The Piña Colada Song)"], ["pimp", "P.I.M.P."], ["mr brightside", "Mr. Brightside"], ["mmm bop", "MMMBop"]]) {
       await page2.goto("http://localhost:8123/"); if (await page2.isVisible("#how-ok")) await page2.click("#how-ok"); await page2.waitForSelector("#guess");
       await page2.fill("#guess", q); await page2.waitForSelector("#sugg li");
       const got = await page2.$$eval("#sugg li", ls => ls.map(l => l.firstChild.textContent));
