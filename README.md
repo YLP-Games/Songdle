@@ -6,15 +6,16 @@ A simple song-guessing game. Hear a tiny clip, guess the song; each skip or wron
 Based on the Songdle game in [Yahyadle](https://ylp-games.github.io/Yahyadle/) ([code](https://github.com/YLP-Games/Yahyadle)), with bigger text and simpler wording.
 
 Works on phones, tablets and computers. To play with your own music, open Settings → "Add your own songs" and paste a
-Spotify or Apple Music playlist or album link (in the app: ••• → Share → Copy link). The playlist has to be public; Spotify
-links bring in up to 100 songs. Added lists are saved on that device only.
+Spotify, Apple Music or YouTube Music playlist or album link (in the app: ••• or ⋮ → Share → Copy link). The playlist has
+to be public (or unlisted on YouTube Music); Spotify links bring in up to 100 songs, YouTube Music up to 200. Added lists
+are saved on that device only.
 
 ## How it's built
 
 - `index.html`: the whole game (no build step)
 - `playlists.json`: built-in song lists, `{"List name": [{"t":title,"a":artist,"y":year,"g":genre,"i":iTunesId,"c":"GB"}]}`. "Charts" comes from Yahyadle.
 - `tools/itunes_ids.py`: adds iTunes track IDs and original years to `playlists.json`
-- `api/playlist.js`: reads a public Spotify or Apple Music playlist/album link for "Add your own songs" (browsers can't read those pages themselves). Runs on Vercel at `songdle-dusky.vercel.app`; redeploy with `vercel deploy --prod` (`.vercelignore` uploads only `api/`)
+- `api/playlist.js`: reads a public Spotify, Apple Music or YouTube Music playlist/album link for "Add your own songs" (browsers can't read those pages themselves). Runs on Vercel at `songdle-dusky.vercel.app`; redeploy with `vercel deploy --prod` (`.vercelignore` uploads only `api/`). YouTube Music goes through the YouTube Data API, with the key in the Vercel env var `YOUTUBE_API_KEY`
 - `tests/test.js`: Playwright checks (iTunes and Deezer stubbed, WAV audio)
 
 Clips come from iTunes previews. Each preview is downloaded and decoded in full before Play lights up, then played through

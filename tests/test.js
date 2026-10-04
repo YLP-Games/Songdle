@@ -112,7 +112,7 @@ async function stub(page, opts = {}) {
     await page.waitForTimeout(500);
     ok(await page.evaluate(() => audio && !audio.paused), "Full preview autoplays after a win");
     ok((await page.textContent(".chips")).includes("Streak 1"), "Streak counts the win");
-    ok(await page.$eval("#lk-am", a => a.href.startsWith("https://audio.test") || a.href.includes("music.apple.com")) && (await page.getAttribute(".sg-links a:last-child", "href")).startsWith("https://open.spotify.com/search/"), "Win card links to Apple Music and Spotify");
+    ok(await page.$eval("#lk-am", a => a.href.startsWith("https://audio.test") || a.href.includes("music.apple.com")) && await page.isVisible('.sg-links a[href^="https://open.spotify.com/search/"]') && await page.isVisible('.sg-links a[href^="https://music.youtube.com/search?q="]'), "Win card links to Apple Music, Spotify and YouTube Music");
     await page.click("#next");
     await page.waitForSelector("#play:not([disabled])");
     ok((await page.textContent(".prev")).includes(t.t), "Next song deals a new round");
@@ -297,6 +297,7 @@ async function stub(page, opts = {}) {
       const p = await browser.newPage();
       await stub(p, {
         playlist: link => /spotify/.test(link) ? { id: "spotify:playlist:abc", name: "Mum & Dad Hits", source: "Spotify", songs: [{ t: "Waterloo", a: "ABBA" }, { t: "Jolene", a: "Dolly Parton" }] }
+          : /youtu/.test(link) ? { id: "youtube:PLfam", name: "Family Mix", source: "YouTube Music", songs: [{ t: "Dancing Queen", a: "ABBA" }, { t: "Africa", a: "Toto" }, { t: "Hello", a: "Adele" }] }
           : /pl\.x/.test(link) ? { id: "apple:playlist:pl.x", name: "Road Trip", source: "Apple Music", songs: [{ t: "Africa", a: "Toto", i: 111 }, { t: "Roxanne", a: "The Police", i: 222, c: "GB" }] }
           : { status: 404, body: { error: "That playlist wasn't found. Check the link is complete and the playlist is public." } },
         lookup: ids => ids.map(i => ({ trackId: +i, trackName: "X", artistName: "X", previewUrl: "https://audio.test/" + i + ".wav", releaseDate: (i === "111" ? 1982 : 1978) + "-03-01T08:00:00Z", primaryGenreName: i === "111" ? "Rock" : "R&B/Soul" })),
@@ -311,6 +312,9 @@ async function stub(page, opts = {}) {
       await p.fill("#imp-link", "https://open.spotify.com/playlist/37i9dQZF1DXbTxeAdrVG2l"); await p.click("#imp-go");
       await p.waitForFunction(() => /Updated/.test(document.querySelector("#imp-msg").textContent));
       ok(await p.evaluate(() => IMPORTS.length === 1), "Adding the same playlist again updates it instead of doubling up");
+      await p.fill("#imp-link", "https://music.youtube.com/playlist?list=PLfam&si=x"); await p.click("#imp-go");
+      await p.waitForFunction(() => /Family Mix/.test(document.querySelector("#imp-msg").textContent));
+      ok((await p.textContent("#imp-msg")).includes('"Family Mix" (3 songs)'), "YouTube Music link adds the playlist too");
       await p.fill("#imp-link", "https://music.apple.com/us/playlist/road-trip/pl.x"); await p.press("#imp-link", "Enter");
       await p.waitForFunction(() => /Road Trip/.test(document.querySelector("#imp-msg").textContent));
       const rt = await p.evaluate(() => IMPORTS.find(x => x.name === "Road Trip").songs);
@@ -323,9 +327,9 @@ async function stub(page, opts = {}) {
       await p.waitForFunction(() => /wasn't found/.test(document.querySelector("#imp-msg").textContent));
       ok(true, "A missing playlist says so in plain words");
       await p.fill("#imp-link", "hello"); await p.click("#imp-go");
-      ok((await p.textContent("#imp-msg")).includes("Paste a Spotify or Apple Music link"), "Text that isn't a link is caught straight away");
+      ok((await p.textContent("#imp-msg")).includes("Paste a Spotify, Apple Music or YouTube Music link"), "Text that isn't a link is caught straight away");
       await p.reload();
-      ok(await p.evaluate(() => IMPORTS.length === 2 && songSource().length === 2), "Added playlists survive a reload");
+      ok(await p.evaluate(() => IMPORTS.length === 3 && songSource().length === 2), "Added playlists survive a reload");
     }
 
     // ---------- Phone and iPad ----------

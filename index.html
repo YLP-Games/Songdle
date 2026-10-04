@@ -127,7 +127,7 @@ dialog .ft{display:flex;justify-content:flex-end;padding:12px 18px;border-top:1p
 .steps{padding-left:1.3em;margin:0 0 10px}.steps li{margin-bottom:12px}.steps .btn{width:100%;margin-top:2px}
 .imp input[type=text]{width:100%;background:#1a1d27;border:1px solid #2c3040;border-radius:10px;padding:11px 12px;color:#e9e9ee;font:16px var(--body);margin:4px 0 10px}
 @media (max-width:600px){body{font-size:16px}.stage{padding:14px 12px}.sg-controls{gap:10px}.sg-side{min-width:0;flex:1;padding:10px 8px}
- .top{flex-wrap:nowrap;gap:6px}.tabs{flex-wrap:nowrap;gap:5px}.tab{flex:1;padding:8px 6px;font-size:14px;line-height:1.15}.gearbtn{min-width:44px;padding:6px}.gearbtn span{display:none}.win{flex-direction:column;text-align:center}.win .actions{justify-content:center}
+ .top{flex-wrap:nowrap;gap:6px}.tabs{flex-wrap:nowrap;gap:5px}.tab{flex:1;padding:8px 6px;font-size:14px;line-height:1.15}.gearbtn{min-width:44px;padding:6px}.gearbtn span{display:none}.win{flex-direction:column;text-align:center}.win .actions,.sg-links{justify-content:center}
  .bar .search{flex:1 1 100%}.bar .btn{flex:1}.sg-row span{font-size:14px;padding:8px 5px}}
 @media (prefers-reduced-motion:reduce){.sg-play.playing::after,.sg-row.new span{animation:none}}
 .sg-links{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}.sg-links span{font-size:14px;color:var(--muted);width:100%}.sg-links .btn{text-decoration:none;display:inline-flex;align-items:center;min-height:44px;padding:8px 16px}
@@ -168,11 +168,11 @@ dialog .ft{display:flex;justify-content:flex-end;padding:12px 18px;border-top:1p
  <div id="lists"></div>
  <h3 style="margin-top:18px">Add your own songs</h3>
  <div class="imp">
-  <p class="snote" style="margin:0 0 4px">In <b>Spotify</b> or <b>Apple Music</b>, open a playlist or album, tap <b>•••</b> → <b>Share</b> → <b>Copy link</b>, then paste it here.</p>
+  <p class="snote" style="margin:0 0 4px">In <b>Spotify</b>, <b>Apple Music</b> or <b>YouTube Music</b>, open a playlist or album, tap <b>•••</b> or <b>⋮</b> → <b>Share</b> → <b>Copy link</b>, then paste it here.</p>
   <input type="text" id="imp-link" inputmode="url" enterkeyhint="go" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Paste the link here" aria-label="Playlist link">
   <button class="btn primary" id="imp-go" type="button" style="width:100%">Add these songs</button>
   <p id="imp-msg" role="status"></p>
-  <p class="snote">Spotify brings in up to 100 songs. Added lists are saved on this phone or computer only.</p>
+  <p class="snote">Spotify brings in up to 100 songs, YouTube Music up to 200. Added lists are saved on this phone or computer only.</p>
  </div>
 </div>
  <div class="ft"><button class="btn primary" id="set-ok" autofocus>Done</button></div>
@@ -414,7 +414,7 @@ function renderGame(st){
     <p class="meta" id="status" role="status">${st.done?"Full preview":"Clip: "+len+"s"} · loading…</p></div>`;
   if(st.done){h+=`<div class="win${st.won?"":" lose"}"><img id="art" class="av" alt="" hidden><div><h3>${esc(t.t)}</h3><span class="meta">${esc(t.a)} · ${t.y||"?"}${t.g?" · "+esc(t.g):""} · ${st.guesses.length} guess${st.guesses.length===1?"":"es"}</span>
       ${st.won?(c=>`<span class="sg-got">Got it in ${c} second${c===1?"":"s"}</span>`)(CLIPS[Math.min(st.guesses.length-1,CLIPS.length-1)]):`<span class="sg-got">Better luck next time</span>`}
-      <div class="sg-links"><span>Add it to your music:</span><a class="btn" id="lk-am" target="_blank" rel="noopener" href="https://music.apple.com/search?term=${encodeURIComponent(t.t+" "+t.a)}">Apple Music</a><a class="btn" target="_blank" rel="noopener" href="https://open.spotify.com/search/${encodeURIComponent(t.t+" "+t.a)}">Spotify</a></div>
+      <div class="sg-links"><span>Add it to your music:</span><a class="btn" id="lk-am" target="_blank" rel="noopener" href="https://music.apple.com/search?term=${encodeURIComponent(t.t+" "+t.a)}">Apple Music</a><a class="btn" target="_blank" rel="noopener" href="https://open.spotify.com/search/${encodeURIComponent(t.t+" "+t.a)}">Spotify</a><a class="btn" target="_blank" rel="noopener" href="https://music.youtube.com/search?q=${encodeURIComponent(t.t+" "+t.a)}">YouTube Music</a></div>
 ${daily?`<div class="actions"><button class="btn primary" id="share">Copy my score</button></div><p id="sharemsg" class="meta" role="status"></p><p class="meta">A new song tomorrow.</p>`:""}</div></div>`}
   else h+=`<div class="bar"><div class="search"><label for="guess" class="sr">Your guess</label><input id="guess" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="Type a song title…" role="combobox" aria-expanded="false" aria-controls="sugg"><ul class="sugg" id="sugg" role="listbox" hidden></ul></div>
      <button class="btn" id="giveup">Give up</button></div>
@@ -549,7 +549,7 @@ function renderSettings(){ensureOneOn();
     IMPORTS=IMPORTS.filter(x=>"u:"+x.id!==id);delete CFG.on[id];save("sd_imports",IMPORTS);changed()})}
 
 /* ---------- Adding a playlist from a link ---------- */
-// Browsers can't read Spotify or Apple Music pages, so api/playlist.js (on Vercel) reads them for us
+// Browsers can't read Spotify, Apple Music or YouTube Music playlists, so api/playlist.js (on Vercel) reads them for us
 const PLAYLIST_API="https://songdle-dusky.vercel.app/api/playlist";
 const GENRES={"Hip-Hop/Rap":"Hip-Hop","Rap":"Hip-Hop","R&B/Soul":"R&B","Soul":"R&B"};
 // Apple Music songs come with their iTunes ID: one lookup fills in every year and genre (lookups work on iPhones too)
@@ -558,7 +558,7 @@ async function addDetails(songs){const by={};for(const s of songs)if(s.i)(by[s.c
     try{const d=await jsonp2("https://itunes.apple.com/lookup?country="+c+"&id="+part.map(s=>s.i).join(","));const m=new Map((d.results||[]).map(r=>[r.trackId,r]));
       for(const s of part){const r=m.get(s.i);if(!r)continue;if(!s.y)s.y=yearOf(r);if(!s.g&&r.primaryGenreName)s.g=GENRES[r.primaryGenreName]||r.primaryGenreName}}catch(e){}}}
 async function importLink(){const v=$("#imp-link").value.trim(),msg=$("#imp-msg"),go=$("#imp-go");
-  if(!/spotify|apple\.co/i.test(v)){msg.textContent="Paste a Spotify or Apple Music link first.";return}
+  if(!/spotify|apple\.co|youtu/i.test(v)){msg.textContent="Paste a Spotify, Apple Music or YouTube Music link first.";return}
   go.disabled=true;msg.textContent="Getting the songs…";
   try{let r,d;try{r=await fetch(PLAYLIST_API+"?url="+encodeURIComponent(v));d=await r.json()}catch(e){throw new Error("Couldn't reach the playlist reader. Check the internet connection and try again.")}
     if(!r.ok||!Array.isArray(d.songs))throw new Error(d.error||"Couldn't read that playlist just now. Please try again in a minute.");
