@@ -163,21 +163,7 @@ dialog .ft{display:flex;justify-content:flex-end;padding:12px 18px;border-top:1p
  <p class="snote" id="flownote"></p>
  <h3 style="margin-top:18px">Song lists</h3>
  <div id="lists"></div>
- <h3 style="margin-top:18px">Add your own playlist</h3>
- <div class="imp">
- <ol class="steps">
-  <li><b>Paste the playlist link</b> from Spotify or Apple Music (in the app: ••• → Share → Copy link).
-   <input type="text" id="imp-link" inputmode="url" autocomplete="off" placeholder="https://open.spotify.com/playlist/…">
-   <button class="btn primary" id="imp-go" type="button">Open TuneMyMusic</button>
-   <span class="snote" id="imp-linkmsg" role="status"></span></li>
-  <li><b>On TuneMyMusic:</b> pick <span id="imp-src">Spotify or Apple Music</span> as the source, choose <b>"Load from URL"</b> and paste the link (it's already copied). Then pick <b>"Export to file"</b> → <b>CSV</b> and download it. No sign-in needed.</li>
-  <li><b>Come back here</b> and choose the downloaded file. It's added straight away.
-   <label class="btn" style="display:flex;align-items:center;justify-content:center;margin-top:6px">Choose the downloaded file<input type="file" id="imp-file" accept=".csv,.txt,text/csv,text/plain" class="sr"></label></li>
- </ol>
- <label>Name for this list (optional)<input type="text" id="imp-name" placeholder="Uses the playlist's own name"></label>
- <p class="snote">Also works with a CSV from exportify.app.</p>
- <p id="imp-msg" role="status"></p>
- <p class="snote">Imported lists are saved on this device only.</p></div></div>
+</div>
  <div class="ft"><button class="btn primary" id="set-ok" autofocus>Done</button></div>
 </dialog>
 
@@ -474,23 +460,11 @@ function renderSettings(){ensureOneOn();
   $("#lists").querySelectorAll(".sopt").forEach(c=>c.onclick=()=>{CFG.on[c.dataset.id]=!listOn(c.dataset.id);changed()});
   $("#lists").querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>{const id=b.dataset.del;if(!confirm("Remove this list from this device?"))return;
     IMPORTS=IMPORTS.filter(x=>"u:"+x.id!==id);delete CFG.on[id];save("sd_imports",IMPORTS);changed()})}
-$("#imp-go").onclick=async()=>{const v=$("#imp-link").value.trim(),m=$("#imp-linkmsg");
-  const src=/spotify\.com|spotify\.link/i.test(v)?"Spotify":/music\.apple\.com/i.test(v)?"Apple Music":"";
-  if(!src){m.textContent="Paste a Spotify or Apple Music playlist link first.";return}
-  $("#imp-src").innerHTML="<b>"+src+"</b>";
-  try{await navigator.clipboard.writeText(v);m.textContent="Link copied. Paste it on TuneMyMusic."}catch(e){m.textContent="Copy the link above, then paste it on TuneMyMusic."}
-  window.open("https://www.tunemymusic.com/transfer","_blank","noopener")};
-$("#imp-file").onchange=e=>{const file=e.target.files[0];if(!file)return;const r=new FileReader();
-  r.onload=()=>{const songs=parseCSV(String(r.result));e.target.value="";
-    if(!songs.length){$("#imp-msg").textContent="Sorry, that file doesn't look like a playlist. It needs song names and artists.";return}
-    const name=$("#imp-name").value.trim()||songs.playlist||file.name.replace(/\.(csv|txt)$/i,"").replace(/^tunemymusic.*$/i,"My playlist");const id=Date.now().toString(36);
-    IMPORTS.push({id,name,songs});CFG.on["u:"+id]=true;save("sd_imports",IMPORTS);CFG.genre="All";$("#imp-name").value="";
-    changed();$("#imp-msg").textContent=`Added "${name}" with ${songs.length} songs.`};
-  r.readAsText(file)};
+
 
 /* ---------- Start ---------- */
 document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{tab=b.dataset.tab;save("sd_tab",tab);render()});
-$("#gear").onclick=()=>{renderSettings();$("#imp-msg").textContent="";$("#settings").showModal()};
+$("#gear").onclick=()=>{renderSettings();$("#settings").showModal()};
 $("#set-ok").onclick=$("#set-x").onclick=()=>$("#settings").close();
 $("#how-x").onclick=()=>$("#how").close();
 $("#help").onclick=()=>$("#how").showModal();
