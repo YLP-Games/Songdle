@@ -21,7 +21,13 @@ async function stub(page, opts = {}) {
     }
     route.fulfill({ contentType: "text/javascript", body: `${cb}(${JSON.stringify({ results })})` });
   });
-  await page.route("https://audio.test/**", r => r.fulfill({ contentType: "audio/wav", body: WAV }));
+  // Answer byte ranges like a real CDN, so the player can seek
+  await page.route("https://audio.test/**", r => {
+    const m = /bytes=(\d+)-(\d*)/.exec(r.request().headers()["range"] || "");
+    if (!m) return r.fulfill({ contentType: "audio/wav", headers: { "accept-ranges": "bytes" }, body: WAV });
+    const s = +m[1], e = m[2] ? +m[2] : WAV.length - 1;
+    r.fulfill({ status: 206, contentType: "audio/wav", headers: { "accept-ranges": "bytes", "content-range": `bytes ${s}-${e}/${WAV.length}` }, body: WAV.subarray(s, e + 1) });
+  });
 }
 
 (async () => {
@@ -43,8 +49,26 @@ async function stub(page, opts = {}) {
     await page.click("#play");
     await page.waitForTimeout(400);
     ok(await page.evaluate(() => audio && audio.paused), "0.1s clip stops by itself");
+    // Skip while playing: the music keeps going from the same spot into the longer clip
     await page.click("#skip");
-    ok((await page.textContent(".left")).includes("4 guesses"), "Skip uses a try");
+    await page.waitForSelector("#play:not([disabled])");
+    await page.click("#play"); await page.waitForTimeout(250);
+    const before = await page.evaluate(() => audio.currentTime);
+    await page.click("#skip");
+    await page.waitForTimeout(150);
+    const flow = await page.evaluate(() => ({ playing: !audio.paused, t: audio.currentTime, limit: ctx.limit }));
+    ok(flow.playing && flow.t >= before && flow.limit === 2, "Skip while playing keeps the song going into the 2s clip (" + JSON.stringify(flow) + ")");
+    await page.waitForTimeout(2200);
+    const ended = await page.evaluate(() => ({ paused: audio.paused, t: audio.currentTime, lim: ctx.limit, g: round.guesses.length, timer, carry }));
+    ok(ended.paused && ended.t < 2.4, "It still stops at the end of the longer clip");
+    await page.click("#skip");
+    const pos = await page.evaluate(() => round.pos);
+    ok(pos > 1.9, "Skip while paused keeps the spot (" + pos.toFixed(2) + "s)");
+    await page.click("#play"); await page.waitForTimeout(300);
+    const cont = await page.evaluate(() => ({ p: !audio.paused, t: audio.currentTime, pos: round.pos, lim: ctx.limit, en: document.querySelector("#play").disabled }));
+    ok(cont.p && cont.t > 2, "Play then carries on into the new part " + JSON.stringify(cont));
+    await page.evaluate(() => stop());
+    ok((await page.textContent(".left")).includes("2 guesses"), "Skip uses a try");
     ok((await page.textContent(".sg-row")).includes("Skipped"), "Skipped row shown");
     // Wrong guess: pick a song by a different artist
     const wrong = await page.evaluate(k => songSource().find(x => x.k !== k && mainArtist(x.a) !== mainArtist(round.target.a) && x.y && x.y !== round.target.y), t.k);

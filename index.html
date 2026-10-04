@@ -264,6 +264,10 @@ function draw(){const sc=$("#sg-scrub");if(!sc||!ctx)return;const {st,limit,tota
   const t=audio&&!audio.paused?Math.min(audio.currentTime,limit):st.pos||0;
   sc.style.setProperty("--open",limit/total*100+"%");sc.style.setProperty("--pos",t/total*100+"%");
   $("#sg-pos").textContent=t.toFixed(1)+"s";sc.setAttribute("aria-valuemax",limit.toFixed(1));sc.setAttribute("aria-valuenow",t.toFixed(1))}
+function keepPlaying(){const c=ctx;const b=$("#play");if(b){b.classList.add("playing");b.setAttribute("aria-label","Pause")}
+  const end=()=>{if(ctx!==c)return;if(timer){clearTimeout(timer);timer=null}cancelAnimationFrame(raf);audio.pause();c.st.pos=c.limit;stop()};
+  const tick=()=>{if(!audio||audio.paused||ctx!==c)return;if(audio.currentTime>=c.limit)return end();draw();raf=requestAnimationFrame(tick)};
+  audio.onended=end;timer=setTimeout(end,Math.max(0,(c.limit-audio.currentTime)*1000));raf=requestAnimationFrame(tick)}
 function play(){if(!audio||!ctx)return;stop();const c=ctx,st=c.st;
   if((st.pos||0)>=c.limit-0.02)st.pos=0;try{audio.currentTime=st.pos||0}catch(e){}
   const b=$("#play");if(b){b.classList.add("playing");b.setAttribute("aria-label","Pause")}
@@ -282,7 +286,9 @@ function newRound(){const pool=songPool();let t=nextSong&&pool.find(x=>x.k===nex
 function prefetch(){if(nextSong)return;const pool=songPool();if(pool.length<2)return;nextSong=pick(pool);
   findPreview(nextSong).then(p=>{if(!p||preAudio[p.url])return;const ks=Object.keys(preAudio);if(ks.length>=3)delete preAudio[ks[0]];const a=new Audio(p.url);a.preload="auto";preAudio[p.url]=a}).catch(()=>{})}
 
-function render(){stop();ctx=null;document.querySelectorAll(".tab").forEach(b=>b.setAttribute("aria-pressed",b.dataset.tab===tab));
+// Skip keeps the music going: render() leaves the audio playing and the new round view picks it up
+let carry=false;
+function render(){if(carry){if(timer){clearTimeout(timer);timer=null}cancelAnimationFrame(raf)}else stop();ctx=null;document.querySelectorAll(".tab").forEach(b=>b.setAttribute("aria-pressed",b.dataset.tab===tab));
   if(tab==="list")return renderList();
   if(!Object.keys(BUILTIN).length&&!IMPORTS.length){$("#stage").innerHTML=`<div class="logo">Song<span>dle</span></div><p class="meta" style="text-align:center">Loading songs…</p>`;return}
   if(tab==="daily"){const st=dailyState();st.target=dailySong(st.date);return renderGame(st)}
@@ -302,7 +308,7 @@ function renderGame(st){
   if(!t){h+=`<div class="clue">No songs match these choices. Try a different genre or era, or switch more lists on in Settings.</div>`;$("#stage").innerHTML=h;wireFilters();return}
   const step=Math.min(st.guesses.length,CLIPS.length-1),len=CLIPS[step];
   const total=st.done?30:CLIPS[CLIPS.length-1],limit=st.done?30:len;
-  if(st.seen!==limit){st.seen=limit;st.pos=0}
+  if(st.seen!==limit){st.seen=limit;if(!st.keepPos)st.pos=0}st.keepPos=false;
   ctx={st,limit,total};
   h+=`<div class="sg-player"><div class="sg-controls">${st.done?`<span class="sg-side"></span>`:`<button class="btn sg-side" id="skip">Skip<small>+${CLIPS[Math.min(step+1,CLIPS.length-1)]}s</small></button>`}
     <button class="sg-play" id="play" aria-label="Play" disabled>${PLAYSVG}</button>
@@ -333,8 +339,9 @@ function renderGame(st){
     if(!p){// No clip: quietly deal another before anyone has guessed
       if(!daily&&st===round&&!st.done&&!st.guesses.length&&(st.auto||0)<6){const n=newRound();n.auto=(st.auto||0)+1;round=n;render();return}
       status.textContent="No preview found for this song."+(st.done||daily?"":" Press Give up to get another one.");return}
-    audio=preAudio[p.url]||(audio&&audio.src===p.url?audio:new Audio(p.url));delete preAudio[p.url];audio.preload="auto";audio.volume=vol;pb.disabled=false;
-    status.textContent=(st.done?"Full preview":"Clip: "+len+"s")+" · press play";
+    {const keep=audio&&audio.src===p.url;if(audio&&!keep)audio.pause();audio=keep?audio:preAudio[p.url]||new Audio(p.url)}delete preAudio[p.url];audio.preload="auto";audio.volume=vol;pb.disabled=false;
+    const going=carry&&!st.done&&!audio.paused;carry=false;
+    status.textContent=(st.done?"Full preview":"Clip: "+len+"s")+(going?" · playing":" · press play");if(going)keepPlaying();
     audio.onloadedmetadata=()=>{if(st.done&&ctx&&ctx.st===st&&isFinite(audio.duration)){ctx.limit=ctx.total=audio.duration;draw()}};if(audio.readyState>=1)audio.onloadedmetadata();
     if(!st.done&&!daily)(audio.readyState>=3?setTimeout(prefetch,300):audio.addEventListener("canplaythrough",prefetch,{once:true}));
     if(st.done){const a=$("#art");if(a&&p.art){a.src=p.art;a.hidden=false}
@@ -359,7 +366,9 @@ function renderGame(st){
   const gu=$("#giveup");if(gu)gu.onclick=()=>{finish(false);render()};
   if(st.done)return;
   const after=()=>{st.fresh=true;if(st.guesses.length>=CLIPS.length&&!st.done)finish(false);if(daily)saveDaily(st);render();if(!st.done){const g=$("#guess");if(g&&!matchMedia("(pointer:coarse)").matches)g.focus()}};
-  $("#skip").onclick=()=>{st.guesses.push({skip:1});after()};
+  $("#skip").onclick=()=>{const playing=!!(audio&&!audio.paused);
+    // Carry on from where the clip got to (or where it stopped), straight into the longer clip
+    st.pos=playing?audio.currentTime:(st.pos||0);st.keepPos=true;carry=playing&&st.guesses.length+1<CLIPS.length;if(playing&&!carry)stop();st.guesses.push({skip:1});after()};
   // Guess from every switched-on song (always including the answer)
   const pool=songSource().slice();if(!pool.some(x=>x.k===t.k))pool.push(t);
   const used=new Set(st.guesses.map(g=>g.k));
