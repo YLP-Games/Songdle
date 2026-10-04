@@ -1,9 +1,9 @@
 # Songdle
 
-**Play it: https://layla310803.github.io/Songdle/**
+**Play it: https://ylp-games.github.io/Songdle/**
 
 A simple song-guessing game. Hear a tiny clip, guess the song; each skip or wrong guess plays a longer clip (0.1s, 0.5s, 2s, 8s, 15s).
-Based on the Songdle game in [Yahyadle](https://github.com/layla310803/Yahyadle), with bigger text and simpler wording.
+Based on the Songdle game in [Yahyadle](https://github.com/YLP-Games/Yahyadle), with bigger text and simpler wording.
 
 Works on phones, tablets and computers. To play with your own music, open Settings → "Add your own songs" and paste a
 Spotify or Apple Music playlist or album link (in the app: ••• → Share → Copy link). The playlist has to be public; Spotify
