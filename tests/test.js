@@ -18,7 +18,8 @@ async function stub(page, opts = {}) {
     let results = [];
     const noPreview = opts.noPreview && opts.noPreview(id, term);
     if (!noPreview) {
-      if (id) results = [{ trackName: "X", artistName: "X", previewUrl: "https://audio.test/" + id + ".wav", artworkUrl100: "" }];
+      if (id && opts.lookup) results = opts.lookup(id.split(","));
+      else if (id) results = [{ trackName: "X", artistName: "X", previewUrl: "https://audio.test/" + id + ".wav", artworkUrl100: "" }];
       else if (opts.search) results = opts.search(term);
       else { const r = SONGS.find(x => x.a + " " + x.t === term); if (r) results = [{ trackName: r.t, artistName: r.a, previewUrl: "https://audio.test/s.wav", releaseDate: r.y + "-01-01" }]; }
     }
@@ -34,6 +35,12 @@ async function stub(page, opts = {}) {
     else { const r = [...SONGS, ...(opts.extra || [])].find(x => x.a + " " + x.t === q);
       if (r) body = { data: [{ id: 1, title: r.t, artist: { name: r.a }, album: { id: 7, title: "Album", cover_medium: "" }, preview: "https://audio.test/dz.wav", link: "", readable: true }] }; }
     route.fulfill({ contentType: "text/javascript", body: `${cb}(${JSON.stringify(body)})` });
+  });
+  // The playlist reader (api/playlist.js)
+  await page.route(/\/api\/playlist\?/, route => {
+    const link = new URL(route.request().url()).searchParams.get("url");
+    const r = opts.playlist ? opts.playlist(link) : { status: 400, body: { error: "That doesn't look like a Spotify or Apple Music playlist link." } };
+    route.fulfill({ status: r.status || 200, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: JSON.stringify(r.body || r) });
   });
   // Answer byte ranges like a real CDN, so the player can seek
   await page.route("https://audio.test/**", r => {
@@ -244,6 +251,42 @@ async function stub(page, opts = {}) {
     ok(dz && dz.url === "orig", "When iTunes has no clip, Deezer's original is used (" + (dz && dz.url) + ")");
     const re = await p8.evaluate(() => findPreview({ k: "everybody|bsb", t: "Everybody (Backstreet's Back)", a: "Backstreet Boys", i: 0, y: 1997 }));
     ok(re && re.url === "radio", "A radio edit counts as the song, an extended version doesn't");
+
+    // ---------- Adding a playlist from a link ----------
+    {
+      const p = await browser.newPage();
+      await stub(p, {
+        playlist: link => /spotify/.test(link) ? { id: "spotify:playlist:abc", name: "Mum & Dad Hits", source: "Spotify", songs: [{ t: "Waterloo", a: "ABBA" }, { t: "Jolene", a: "Dolly Parton" }] }
+          : /pl\.x/.test(link) ? { id: "apple:playlist:pl.x", name: "Road Trip", source: "Apple Music", songs: [{ t: "Africa", a: "Toto", i: 111 }, { t: "Roxanne", a: "The Police", i: 222, c: "GB" }] }
+          : { status: 404, body: { error: "That playlist wasn't found. Check the link is complete and the playlist is public." } },
+        lookup: ids => ids.map(i => ({ trackId: +i, trackName: "X", artistName: "X", previewUrl: "https://audio.test/" + i + ".wav", releaseDate: (i === "111" ? 1982 : 1978) + "-03-01T08:00:00Z", primaryGenreName: i === "111" ? "Rock" : "R&B/Soul" })),
+      });
+      await p.goto("http://localhost:8123/"); await p.click("#how-ok"); await p.waitForFunction(() => Object.keys(BUILTIN).length);
+      await p.click("#gear");
+      await p.fill("#imp-link", "Listen to this https://open.spotify.com/playlist/37i9dQZF1DXbTxeAdrVG2l?si=1");
+      await p.click("#imp-go");
+      await p.waitForFunction(() => /Added/.test(document.querySelector("#imp-msg").textContent));
+      ok((await p.textContent("#imp-msg")).includes('"Mum & Dad Hits" (2 songs)'), "Spotify link adds the playlist under its own name");
+      ok(await p.isVisible('#lists .sopt[data-id^="u:"][aria-checked="true"]'), "The new list is switched on");
+      await p.fill("#imp-link", "https://open.spotify.com/playlist/37i9dQZF1DXbTxeAdrVG2l"); await p.click("#imp-go");
+      await p.waitForFunction(() => /Updated/.test(document.querySelector("#imp-msg").textContent));
+      ok(await p.evaluate(() => IMPORTS.length === 1), "Adding the same playlist again updates it instead of doubling up");
+      await p.fill("#imp-link", "https://music.apple.com/us/playlist/road-trip/pl.x"); await p.press("#imp-link", "Enter");
+      await p.waitForFunction(() => /Road Trip/.test(document.querySelector("#imp-msg").textContent));
+      const rt = await p.evaluate(() => IMPORTS.find(x => x.name === "Road Trip").songs);
+      ok(rt[0].y === 1982 && rt[0].g === "Rock" && rt[1].y === 1978 && rt[1].g === "R&B", "Apple Music songs get their years and genres " + JSON.stringify(rt));
+      await p.click("#imp-only");
+      ok(!(await p.isVisible("#settings")) && await p.evaluate(() => tab === "play" && songSource().length === 2 && songSource().every(x => x.lists[0] === "Road Trip")), "Play only these: just that list, straight to the game");
+      await p.waitForSelector("#play:not([disabled])");
+      await p.click("#gear");
+      await p.fill("#imp-link", "https://music.apple.com/us/playlist/pl.gone"); await p.click("#imp-go");
+      await p.waitForFunction(() => /wasn't found/.test(document.querySelector("#imp-msg").textContent));
+      ok(true, "A missing playlist says so in plain words");
+      await p.fill("#imp-link", "hello"); await p.click("#imp-go");
+      ok((await p.textContent("#imp-msg")).includes("Paste a Spotify or Apple Music link"), "Text that isn't a link is caught straight away");
+      await p.reload();
+      ok(await p.evaluate(() => IMPORTS.length === 2 && songSource().length === 2), "Added playlists survive a reload");
+    }
 
     // ---------- Phone and iPad ----------
     for (const [name, dev] of [["iphone", devices["iPhone 13"]], ["ipad", devices["iPad (gen 7)"]]]) {

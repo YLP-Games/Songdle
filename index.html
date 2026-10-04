@@ -164,6 +164,14 @@ dialog .ft{display:flex;justify-content:flex-end;padding:12px 18px;border-top:1p
  <p class="snote" id="flownote"></p>
  <h3 style="margin-top:18px">Song lists</h3>
  <div id="lists"></div>
+ <h3 style="margin-top:18px">Add your own songs</h3>
+ <div class="imp">
+  <p class="snote" style="margin:0 0 4px">In <b>Spotify</b> or <b>Apple Music</b>, open a playlist or album, tap <b>•••</b> → <b>Share</b> → <b>Copy link</b>, then paste it here.</p>
+  <input type="text" id="imp-link" inputmode="url" enterkeyhint="go" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Paste the link here" aria-label="Playlist link">
+  <button class="btn primary" id="imp-go" type="button" style="width:100%">Add these songs</button>
+  <p id="imp-msg" role="status"></p>
+  <p class="snote">Spotify brings in up to 100 songs. Added lists are saved on this phone or computer only.</p>
+ </div>
 </div>
  <div class="ft"><button class="btn primary" id="set-ok" autofocus>Done</button></div>
 </dialog>
@@ -489,10 +497,34 @@ function renderSettings(){ensureOneOn();
   $("#lists").querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>{const id=b.dataset.del;if(!confirm("Remove this list from this device?"))return;
     IMPORTS=IMPORTS.filter(x=>"u:"+x.id!==id);delete CFG.on[id];save("sd_imports",IMPORTS);changed()})}
 
+/* ---------- Adding a playlist from a link ---------- */
+// Browsers can't read Spotify or Apple Music pages, so api/playlist.js (on Vercel) reads them for us
+const PLAYLIST_API="https://songdle-dusky.vercel.app/api/playlist";
+const GENRES={"Hip-Hop/Rap":"Hip-Hop","Rap":"Hip-Hop","R&B/Soul":"R&B","Soul":"R&B"};
+// Apple Music songs come with their iTunes ID: one lookup fills in every year and genre (lookups work on iPhones too)
+async function addDetails(songs){const by={};for(const s of songs)if(s.i)(by[s.c||"US"]=by[s.c||"US"]||[]).push(s);
+  for(const [c,L] of Object.entries(by))for(let n=0;n<L.length;n+=150){const part=L.slice(n,n+150);
+    try{const d=await jsonp2("https://itunes.apple.com/lookup?country="+c+"&id="+part.map(s=>s.i).join(","));const m=new Map((d.results||[]).map(r=>[r.trackId,r]));
+      for(const s of part){const r=m.get(s.i);if(!r)continue;if(!s.y)s.y=yearOf(r);if(!s.g&&r.primaryGenreName)s.g=GENRES[r.primaryGenreName]||r.primaryGenreName}}catch(e){}}}
+async function importLink(){const v=$("#imp-link").value.trim(),msg=$("#imp-msg"),go=$("#imp-go");
+  if(!/spotify|apple\.co/i.test(v)){msg.textContent="Paste a Spotify or Apple Music link first.";return}
+  go.disabled=true;msg.textContent="Getting the songs…";
+  try{let r,d;try{r=await fetch(PLAYLIST_API+"?url="+encodeURIComponent(v));d=await r.json()}catch(e){throw new Error("Couldn't reach the playlist reader. Check the internet connection and try again.")}
+    if(!r.ok||!Array.isArray(d.songs))throw new Error(d.error||"Couldn't read that playlist just now. Please try again in a minute.");
+    await addDetails(d.songs);
+    const old=IMPORTS.find(x=>x.src&&x.src===d.id),id=old?old.id:Date.now().toString(36);
+    if(old){old.name=d.name;old.songs=d.songs}else IMPORTS.push({id,name:d.name,src:d.id,songs:d.songs});
+    CFG.on["u:"+id]=true;CFG.genre="All";CFG.era="All";save("sd_imports",IMPORTS);$("#imp-link").value="";changed();
+    msg.innerHTML=`${old?"Updated":"Added"} "${esc(d.name)}" (${d.songs.length} songs). <button class="btn primary" id="imp-only" type="button" style="width:100%;margin-top:8px">Play only these songs</button>`;
+    $("#imp-only").onclick=()=>{for(const l of allLists())CFG.on[l.id]=l.id==="u:"+id;tab="play";save("sd_tab",tab);$("#settings").close();changed()}}
+  catch(e){msg.textContent=e.message}
+  finally{go.disabled=false}}
+$("#imp-go").onclick=importLink;
+$("#imp-link").onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();importLink()}};
 
 /* ---------- Start ---------- */
 document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{tab=b.dataset.tab;save("sd_tab",tab);render()});
-$("#gear").onclick=()=>{renderSettings();$("#settings").showModal()};
+$("#gear").onclick=()=>{renderSettings();$("#imp-msg").textContent="";$("#settings").showModal()};
 $("#set-ok").onclick=$("#set-x").onclick=()=>$("#settings").close();
 $("#how-x").onclick=()=>$("#how").close();
 $("#help").onclick=()=>$("#how").showModal();
