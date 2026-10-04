@@ -33,7 +33,7 @@ async function stub(page, opts = {}) {
     else if (opts.noPreview && opts.noPreview(null, q)) body = { data: [] };
     else if (opts.deezer) body = { data: opts.deezer(q) };
     else { const r = [...SONGS, ...(opts.extra || [])].find(x => x.a + " " + x.t === q);
-      if (r) body = { data: [{ id: 1, title: r.t, artist: { name: r.a }, album: { id: 7, title: "Album", cover_medium: "" }, preview: "https://audio.test/dz.wav", link: "", readable: true }] }; }
+      if (r) body = { data: [{ id: 1, title: r.t, artist: { name: r.a }, album: { id: 7, title: "Album", cover_medium: "" }, preview: "https://audio.test/dz.wav", link: "https://www.deezer.com/track/1", readable: true }] }; }
     route.fulfill({ contentType: "text/javascript", body: `${cb}(${JSON.stringify(body)})` });
   });
   // The playlist reader (api/playlist.js)
@@ -236,6 +236,8 @@ async function stub(page, opts = {}) {
       ok(await p.evaluate(() => audio.src === "https://audio.test/dz.wav" && round.target.y === 1994), "iPhone: a song without an iTunes ID plays Deezer's clip and gets its year");
       await p.click("#play"); await p.waitForTimeout(400);
       ok(await p.evaluate(() => audio.src.endsWith("dz.wav") && audio.currentTime > 0 && audio.paused), "iPhone: play button plays the clip");
+      await p.click("#giveup"); await p.waitForTimeout(200);
+      ok((await p.getAttribute("#lk-am", "href")).startsWith("https://music.apple.com/"), "iPhone: the Apple Music button still goes to Apple Music after a Deezer clip");
       ok(perr.length === 0, "iPhone: no page errors " + perr.join("; "));
       await c.close();
     }

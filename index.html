@@ -276,7 +276,7 @@ async function deezer(song,t,ok){
     const ys=(await Promise.all(ids.map(id=>jsonp("https://api.deezer.com/album/"+id+"?output=jsonp").then(a=>yearOf({releaseDate:a.release_date}),()=>0)))).filter(Boolean);
     for(const r of near){const m=/^[A-Z]{2}[A-Z0-9]{3}(\d\d)\d{5}$/.exec(r.x.isrc||"");if(m)ys.push(+m[1]+(+m[1]>new Date().getFullYear()%100?1900:2000))}
     if(ys.length)year=Math.min(...ys)}
-  return{url:r.x.preview,art:r.x.album&&r.x.album.cover_medium||"",link:r.x.link||"",year}}
+  return{url:r.x.preview,art:r.x.album&&r.x.album.cover_medium||"",link:"",year}}   // no link: the "Apple Music" button keeps its search
 
 /* ---------- Stats ---------- */
 const STATS=Object.assign({w:0,streak:0,best:0},load("sd_stats",{}));
