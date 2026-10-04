@@ -184,6 +184,7 @@ async function stub(page, opts = {}) {
     const p6 = await browser.newPage(); await stub(p6); await p6.goto("http://localhost:8123/"); await p6.click("#how-ok");
     await p6.waitForSelector("#play:not([disabled])");
     await p6.click("#gear"); await p6.click('#startseg [data-start="2"]');
+    ok((await p6.$$eval("#startseg button", b => b.map(x => x.textContent))).join() === "0.1s,0.5s,1s,2s,5s", "Clip length choices are in order");
     ok((await p6.textContent("#startnote")).includes("2s → 8s → 15s"), "Settings shows the clip lengths for a 2s start");
     await p6.click("#set-ok"); await p6.waitForSelector("#play:not([disabled])");
     ok(await p6.evaluate(() => ctx.limit === 2), "Game starts with a 2s clip");
