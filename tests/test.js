@@ -154,10 +154,10 @@ async function stub(page, opts = {}) {
 
     // ---------- No preview: quietly deal another ----------
     const p3 = await browser.newPage(); let misses = 0;
-    await stub(p3, { noPreview: () => misses++ < 2 });
+    await stub(p3, { noPreview: () => misses++ < 3 });
     await p3.goto("http://localhost:8123/"); await p3.click("#how-ok");
     await p3.waitForSelector("#play:not([disabled])", { timeout: 15000 });
-    ok(misses >= 2 && await p3.evaluate(() => round.auto >= 1), "Songs without a preview are skipped quietly");
+    ok(misses >= 3 && await p3.evaluate(() => round.auto >= 1), "Songs without a preview are skipped quietly");
 
     // ---------- Search accepts only the real artist's original ----------
     const p5 = await browser.newPage(); await stub(p5, { search: () => [{ trackName: "Hello", artistName: "Karaoke Hits", previewUrl: "kar", releaseDate: "2010" }] });
@@ -190,6 +190,12 @@ async function stub(page, opts = {}) {
     ok(await p6.evaluate(() => ctx.limit === 2), "Game starts with a 2s clip");
     await p6.click("#skip");
     ok(await p6.evaluate(() => ctx.limit === 8) && (await p6.textContent("#skip")).includes("+15s"), "Skip moves to 8s, next 15s");
+    // "Start again" setting: skip while playing stops, next clip starts from 0
+    await p6.click("#gear"); await p6.click('#flowseg [data-flow="false"]'); await p6.click("#set-ok");
+    await p6.waitForSelector("#play:not([disabled])"); await p6.click("#play"); await p6.waitForTimeout(300);
+    await p6.click("#skip"); await p6.waitForTimeout(200);
+    ok(await p6.evaluate(() => audio.paused && (round.pos || 0) === 0), "Start again: skip stops and resets to the beginning");
+    await p6.click("#gear"); await p6.click('#flowseg [data-flow="true"]'); await p6.click("#set-ok");
     await p6.reload(); await p6.waitForSelector("#play:not([disabled])");
     ok(await p6.evaluate(() => ctx.limit === 2), "Start length remembered after reload");
 

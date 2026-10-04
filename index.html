@@ -157,6 +157,9 @@ dialog .ft{display:flex;justify-content:flex-end;padding:12px 18px;border-top:1p
  <h3>First clip length</h3>
  <div class="sseg" id="startseg" role="radiogroup" aria-label="First clip length"></div>
  <p class="snote" id="startnote"></p>
+ <h3 style="margin-top:18px">When you press Skip</h3>
+ <div class="sseg" id="flowseg" role="radiogroup" aria-label="When you press Skip"></div>
+ <p class="snote" id="flownote"></p>
  <h3 style="margin-top:18px">Song lists</h3>
  <div id="lists"></div>
  <h3 style="margin-top:18px">Add your own playlist</h3>
@@ -185,7 +188,7 @@ let CLIPS=LADDERS["0.1"];
 const ERAS=[["All",0,9999],["Classic (before 2000)",0,1999],["2000s",2000,2009],["2010s",2010,2019],["2020s",2020,9999]];
 let BUILTIN={};                              // playlists.json: {"Charts":[{t,a,y,g,i,c}], ...}
 let IMPORTS=load("sd_imports",[]);           // [{id,name,songs}]
-const CFG=Object.assign({on:{},genre:"All",era:"All",start:"0.1"},load("sd_cfg",{}));if(!LADDERS[CFG.start])CFG.start="0.1";CLIPS=LADDERS[CFG.start];
+const CFG=Object.assign({on:{},genre:"All",era:"All",start:"0.1",flow:true},load("sd_cfg",{}));if(!LADDERS[CFG.start])CFG.start="0.1";CLIPS=LADDERS[CFG.start];
 let YEARFIX=load("sd_years",{});
 
 function allLists(){return[...Object.keys(BUILTIN).map(n=>({id:"b:"+n,name:n,songs:BUILTIN[n],builtin:true})),...IMPORTS.map(x=>({id:"u:"+x.id,name:x.name,songs:x.songs}))]}
@@ -221,27 +224,30 @@ function applyYear(song,info){const y=info&&info.year;if(!y||(song.y&&song.y<=y)
 const prevCache={};
 function jsonp(url){return new Promise((res,rej)=>{const cb="__jp"+Math.random().toString(36).slice(2);const sc=document.createElement("script");const t=setTimeout(()=>{cleanup();rej(new Error("timeout"))},9000);
   function cleanup(){clearTimeout(t);delete window[cb];sc.remove()}window[cb]=d=>{cleanup();res(d)};sc.src=url+(url.includes("?")?"&":"?")+"callback="+cb;sc.onerror=()=>{cleanup();rej(new Error("blocked"))};document.head.appendChild(sc)})}
+// One retry: a phone waking up or a busy moment at Apple often fails the first time
+const jsonp2=url=>jsonp(url).catch(()=>new Promise(r=>setTimeout(r,800)).then(()=>jsonp(url)));
 const clean=s=>String(s).toLowerCase().replace(/\(.*?\)|\[.*?\]|feat\..*$/g,"").replace(/[^\p{L}\p{N}]+/gu," ").trim();
 const VARIANT=/\b(remix|edit|mix|version|slowed|sped|nightcore|live|acoustic|instrumental|cover|karaoke|rework|bootleg|vip|flip|mashup)\b/i;
 const FAKE=/karaoke|tribute|made famous|in the style of|originally performed|backing track|lullaby|8[- ]bit|music box|cover version|covers?\b|vitamin string|rockabye baby|twinkle twinkle|piano version|sped up|slowed/i;
 async function findPreview(song){
   if(song.k in prevCache)return prevCache[song.k];
   const art=r=>(r.artworkUrl100||"").replace("100x100","300x300");
-  if(song.i){try{const d=await jsonp("https://itunes.apple.com/lookup?id="+song.i+"&country="+(song.c||"US"));const r=(d.results||[]).find(x=>x.previewUrl);
+  if(song.i){try{const d=await jsonp2("https://itunes.apple.com/lookup?id="+song.i+"&country="+(song.c||"US"));const r=(d.results||[]).find(x=>x.previewUrl);
     if(r)return prevCache[song.k]={url:r.previewUrl,art:art(r),link:r.trackViewUrl,year:0}}catch(e){}}
   const own=VARIANT.test(song.t)||FAKE.test(song.t),variant=n=>!own&&VARIANT.test(n);
   const who=[...artistSet(song.a,song.t)].map(clean).filter(x=>x.length>1);
   const byArtist=x=>{const an=clean(x.artistName);return who.some(w=>an.includes(w)||(an.length>2&&w.includes(an)))};
   const genuine=x=>own||!(variant(x.trackName)||FAKE.test(x.trackName+" | "+x.artistName+" | "+(x.collectionName||"")));
   const oldest=L=>L.slice().sort((p,q)=>String(p.releaseDate||"9").localeCompare(String(q.releaseDate||"9")))[0]||null;
-  const t=clean(song.t);let best=null;const yrs=[];
+  const t=clean(song.t);let best=null,fails=0;const yrs=[];
   for(const country of ["US","GB"]){
-    const d=await jsonp("https://itunes.apple.com/search?media=music&entity=song&limit=50&country="+country+"&term="+encodeURIComponent(song.a+" "+song.t));
+    let d;try{d=await jsonp2("https://itunes.apple.com/search?media=music&entity=song&limit=50&country="+country+"&term="+encodeURIComponent(song.a+" "+song.t))}catch(e){fails++;continue}
     const all=(d.results||[]).filter(x=>byArtist(x)&&genuine(x)),r=all.filter(x=>x.previewUrl);
     yrs.push(...all.filter(x=>(clean(x.trackName)===t||clean(x.trackName).startsWith(t+" "))&&x.releaseDate).map(x=>+String(x.releaseDate).slice(0,4)).filter(y=>y>1900));
     best=oldest(r.filter(x=>clean(x.trackName)===t))||oldest(r.filter(x=>clean(x.trackName).startsWith(t+" ")))||null;
     if(best)break}
   const year=yrs.length?Math.min(...yrs):0;
+  if(!best&&fails===2)throw new Error("offline");   // couldn't ask Apple at all: don't remember this song as "no preview"
   return prevCache[song.k]=best?{url:best.previewUrl,art:art(best),link:best.trackViewUrl,year}:null}
 
 /* ---------- Stats ---------- */
@@ -356,7 +362,11 @@ function renderGame(st){
     if(!st.done&&!daily)(audio.readyState>=3?setTimeout(prefetch,300):audio.addEventListener("canplaythrough",prefetch,{once:true}));
     if(st.done){const a=$("#art");if(a&&p.art){a.src=p.art;a.hidden=false}
       if(st.won&&!st.autoplayed){st.autoplayed=true;if(daily)saveDaily(st);status.textContent="Full preview · playing";st.pos=0;play()}}
-  }).catch(()=>{status.textContent="Couldn't reach Apple Music. Check the internet connection and try again."});
+  }).catch(e=>{console.error(e);if(!$("#play")||pb!==$("#play"))return;
+    // Before any guesses, quietly try another song; after that, offer a retry
+    if(!daily&&st===round&&!st.done&&!st.guesses.length&&(st.auto||0)<4){const n=newRound();n.auto=(st.auto||0)+1;round=n;render();return}
+    status.innerHTML=`Couldn't load the music. Check the internet connection. <button class="btn" id="retry" style="min-height:40px;padding:6px 14px;margin-left:6px">Try again</button>`;
+    $("#retry").onclick=()=>render()});
   pb.onclick=()=>{if(audio&&!audio.paused)stop();else play()};
   $("#vol").oninput=e=>{vol=e.target.value/100;if(audio)audio.volume=vol;$("#vol-out").textContent=e.target.value+"%";save("sd_vol",vol)};
   // Drag or tap the bar to move within the unlocked part
@@ -378,6 +388,7 @@ function renderGame(st){
   const after=()=>{st.fresh=true;if(st.guesses.length>=CLIPS.length&&!st.done)finish(false);if(daily)saveDaily(st);render();if(!st.done){const g=$("#guess");if(g&&!matchMedia("(pointer:coarse)").matches)g.focus()}};
   $("#skip").onclick=()=>{const playing=!!(audio&&!audio.paused);
     // Carry on from where the clip got to (or where it stopped), straight into the longer clip
+    if(!CFG.flow){stop();st.guesses.push({skip:1});after();return}
     st.pos=playing?audio.currentTime:(st.pos||0);st.keepPos=true;carry=playing&&st.guesses.length+1<CLIPS.length;if(playing&&!carry)stop();st.guesses.push({skip:1});after()};
   // Guess from every switched-on song (always including the answer)
   const pool=songSource().slice();if(!pool.some(x=>x.k===t.k))pool.push(t);
@@ -439,6 +450,9 @@ function parseCSV(text){
 }
 function changed(){ensureOneOn();save("sd_cfg",CFG);srcCache=null;round=null;nextSong=null;renderSettings();render()}
 function renderSettings(){ensureOneOn();
+  $("#flowseg").innerHTML=[[true,"Carry on"],[false,"Start again"]].map(([v,l])=>`<button role="radio" aria-checked="${CFG.flow===v}" data-flow="${v}">${l}</button>`).join("");
+  $("#flownote").textContent=CFG.flow?"The music keeps going from where it got to, into the longer clip.":"Each longer clip plays from the beginning of the song.";
+  $("#flowseg").querySelectorAll("button").forEach(b=>b.onclick=()=>{CFG.flow=b.dataset.flow==="true";save("sd_cfg",CFG);renderSettings()});
   $("#startseg").innerHTML=Object.keys(LADDERS).map(k=>`<button role="radio" aria-checked="${CFG.start===k}" data-start="${k}">${k}s</button>`).join("");
   $("#startnote").textContent="Clips go: "+[...new Set(CLIPS)].map(c=>c+"s").join(" → ")+" (5 tries)";
   $("#startseg").querySelectorAll("button").forEach(b=>b.onclick=()=>{CFG.start=b.dataset.start;CLIPS=LADDERS[CFG.start];changed()});const L=allLists(),onCount=L.filter(l=>listOn(l.id)).length;
