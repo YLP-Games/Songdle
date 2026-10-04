@@ -178,7 +178,9 @@ const save=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
 
 /* ---------- Song lists ---------- */
 // How long the first clip is (Settings); each skip or wrong guess moves to the next length
-const LADDERS={"0.1":[0.1,0.5,2,8,15],"0.5":[0.5,1,3,8,15],"1":[1,2,4,8,15],"2":[2,4,7,11,15],"5":[5,8,11,15,20]};
+// Starting later just skips the shorter default lengths; you still get 5 tries (the last ones stay at 15s)
+const BASE=[0.1,0.5,2,8,15],LADDERS={};
+for(const k of ["0.1","0.5","1","2","5"]){const L=[+k,...BASE.filter(c=>c>+k)];while(L.length<BASE.length)L.push(BASE[BASE.length-1]);LADDERS[k]=L}
 let CLIPS=LADDERS["0.1"];
 const ERAS=[["All",0,9999],["Classic (before 2000)",0,1999],["2000s",2000,2009],["2010s",2010,2019],["2020s",2020,9999]];
 let BUILTIN={};                              // playlists.json: {"Charts":[{t,a,y,g,i,c}], ...}
@@ -435,7 +437,7 @@ function parseCSV(text){
 function changed(){ensureOneOn();save("sd_cfg",CFG);srcCache=null;round=null;nextSong=null;renderSettings();render()}
 function renderSettings(){ensureOneOn();
   $("#startseg").innerHTML=Object.keys(LADDERS).map(k=>`<button role="radio" aria-checked="${CFG.start===k}" data-start="${k}">${k}s</button>`).join("");
-  $("#startnote").textContent="Clips go: "+CLIPS.map(c=>c+"s").join(" → ");
+  $("#startnote").textContent="Clips go: "+[...new Set(CLIPS)].map(c=>c+"s").join(" → ")+" (5 tries)";
   $("#startseg").querySelectorAll("button").forEach(b=>b.onclick=()=>{CFG.start=b.dataset.start;CLIPS=LADDERS[CFG.start];changed()});const L=allLists(),onCount=L.filter(l=>listOn(l.id)).length;
   $("#lists").innerHTML=L.map(l=>{const on=listOn(l.id),lock=on&&onCount===1;return`<div class="srow"><button class="sopt" role="switch" aria-checked="${on}" data-id="${esc(l.id)}"${lock?" disabled":""}>
     <span><b>${esc(l.name)}</b><small>${l.songs.length} songs${l.builtin?"":" · on this device"}${lock?" · at least one list stays on":""}</small></span><span class="tg${on?" on":""}"></span></button>${l.builtin?"":`<button class="btn" data-del="${esc(l.id)}">Remove</button>`}</div>`}).join("");

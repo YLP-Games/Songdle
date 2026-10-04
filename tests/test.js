@@ -177,11 +177,11 @@ async function stub(page, opts = {}) {
     const p6 = await browser.newPage(); await stub(p6); await p6.goto("http://localhost:8123/"); await p6.click("#how-ok");
     await p6.waitForSelector("#play:not([disabled])");
     await p6.click("#gear"); await p6.click('#startseg [data-start="2"]');
-    ok((await p6.textContent("#startnote")).includes("2s → 4s"), "Settings shows the clip lengths for a 2s start");
+    ok((await p6.textContent("#startnote")).includes("2s → 8s → 15s"), "Settings shows the clip lengths for a 2s start");
     await p6.click("#set-ok"); await p6.waitForSelector("#play:not([disabled])");
     ok(await p6.evaluate(() => ctx.limit === 2), "Game starts with a 2s clip");
     await p6.click("#skip");
-    ok(await p6.evaluate(() => ctx.limit === 4) && (await p6.textContent("#skip")).includes("+7s"), "Skip moves to 4s, next 7s");
+    ok(await p6.evaluate(() => ctx.limit === 8) && (await p6.textContent("#skip")).includes("+15s"), "Skip moves to 8s, next 15s");
     await p6.reload(); await p6.waitForSelector("#play:not([disabled])");
     ok(await p6.evaluate(() => ctx.limit === 2), "Start length remembered after reload");
 
