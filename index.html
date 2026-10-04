@@ -365,7 +365,7 @@ function renderGame(st){
   }).catch(e=>{console.error(e);if(!$("#play")||pb!==$("#play"))return;
     // Before any guesses, quietly try another song; after that, offer a retry
     if(!daily&&st===round&&!st.done&&!st.guesses.length&&(st.auto||0)<4){const n=newRound();n.auto=(st.auto||0)+1;round=n;render();return}
-    status.innerHTML=`Couldn't load the music. Check the internet connection. <button class="btn" id="retry" style="min-height:40px;padding:6px 14px;margin-left:6px">Try again</button>`;
+    status.innerHTML=`Couldn't load the music. Check the internet connection.<small style="display:block;opacity:.6;font-size:11px">(${esc(String(e&&(e.message||e)).slice(0,120))})</small> <button class="btn" id="retry" style="min-height:40px;padding:6px 14px;margin-left:6px">Try again</button>`;
     $("#retry").onclick=()=>render()});
   pb.onclick=()=>{if(audio&&!audio.paused)stop();else play()};
   $("#vol").oninput=e=>{vol=e.target.value/100;if(audio)audio.volume=vol;$("#vol-out").textContent=e.target.value+"%";save("sd_vol",vol)};
