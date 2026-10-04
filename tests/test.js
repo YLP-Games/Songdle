@@ -90,6 +90,7 @@ async function stub(page, opts = {}) {
     await page.waitForTimeout(500);
     ok(await page.evaluate(() => audio && !audio.paused), "Full preview autoplays after a win");
     ok((await page.textContent(".chips")).includes("Streak 1"), "Streak counts the win");
+    ok(await page.$eval("#lk-am", a => a.href.startsWith("https://audio.test") || a.href.includes("music.apple.com")) && (await page.getAttribute(".sg-links a:last-child", "href")).startsWith("https://open.spotify.com/search/"), "Win card links to Apple Music and Spotify");
     await page.click("#next");
     await page.waitForSelector("#play:not([disabled])");
     ok((await page.textContent(".prev")).includes(t.t), "Next song deals a new round");
