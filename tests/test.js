@@ -173,6 +173,14 @@ async function stub(page, opts = {}) {
     const pr = await p4.evaluate(() => findPreview({ k: "hello|adele", t: "Hello", a: "Adele", i: 0 }));
     ok(pr && pr.url === "orig" && pr.year === 2015, "Search picks the earliest original recording");
 
+    // ---------- Search finds words anywhere in the title ----------
+    for (const [q, want] of [["shoop shoop", "Exhale (Shoop Shoop)"], ["dont stop", "Don't Stop Believin'"], ["pina colada", "Escape (The Piña Colada Song)"]]) {
+      await page2.goto("http://localhost:8123/"); if (await page2.isVisible("#how-ok")) await page2.click("#how-ok"); await page2.waitForSelector("#guess");
+      await page2.fill("#guess", q); await page2.waitForSelector("#sugg li");
+      const got = await page2.$$eval("#sugg li", ls => ls.map(l => l.firstChild.textContent));
+      ok(got.includes(want), `Typing "${q}" suggests ${want}`);
+    }
+
     // ---------- First clip length setting ----------
     const p6 = await browser.newPage(); await stub(p6); await p6.goto("http://localhost:8123/"); await p6.click("#how-ok");
     await p6.waitForSelector("#play:not([disabled])");
