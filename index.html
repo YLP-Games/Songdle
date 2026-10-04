@@ -122,6 +122,7 @@ dialog .ft{display:flex;justify-content:flex-end;padding:12px 18px;border-top:1p
 .sseg button[aria-checked="true"]{background:var(--accent);color:var(--on-accent)}
 .srow{display:flex;gap:8px;align-items:stretch}.srow .sopt{flex:1}
 .snote{font-size:14px;color:#9a9db0}
+.steps{padding-left:1.3em;margin:0 0 10px}.steps li{margin-bottom:12px}.steps .btn{width:100%;margin-top:2px}
 .imp input[type=text]{width:100%;background:#1a1d27;border:1px solid #2c3040;border-radius:10px;padding:11px 12px;color:#e9e9ee;font:16px var(--body);margin:4px 0 10px}
 @media (max-width:600px){body{font-size:16px}.stage{padding:14px 12px}.sg-controls{gap:10px}.sg-side{min-width:0;flex:1;padding:10px 8px}
  .top{flex-wrap:nowrap;gap:6px}.tabs{flex-wrap:nowrap;gap:5px}.tab{flex:1;padding:8px 6px;font-size:14px;line-height:1.15}.gearbtn{min-width:44px;padding:6px}.gearbtn span{display:none}.win{flex-direction:column;text-align:center}.win .actions{justify-content:center}
@@ -164,9 +165,17 @@ dialog .ft{display:flex;justify-content:flex-end;padding:12px 18px;border-top:1p
  <div id="lists"></div>
  <h3 style="margin-top:18px">Add your own playlist</h3>
  <div class="imp">
- <p class="snote" style="margin-top:0">Save a playlist as a CSV file, then choose it here. From Spotify use <b>exportify.app</b>. From Apple Music use <b>tunemymusic.com</b> (choose "Export to file").</p>
- <label>Name for this list<input type="text" id="imp-name" placeholder="e.g. Mum's favourites"></label>
- <label class="btn" style="display:inline-flex;align-items:center">Choose CSV file<input type="file" id="imp-file" accept=".csv,text/csv" class="sr"></label>
+ <ol class="steps">
+  <li><b>Paste the playlist link</b> from Spotify or Apple Music (in the app: ••• → Share → Copy link).
+   <input type="text" id="imp-link" inputmode="url" autocomplete="off" placeholder="https://open.spotify.com/playlist/…">
+   <button class="btn primary" id="imp-go" type="button">Open TuneMyMusic</button>
+   <span class="snote" id="imp-linkmsg" role="status"></span></li>
+  <li><b>On TuneMyMusic:</b> pick <span id="imp-src">Spotify or Apple Music</span> as the source, choose <b>"Load from URL"</b> and paste the link (it's already copied). Then pick <b>"Export to file"</b> → <b>CSV</b> and download it. No sign-in needed.</li>
+  <li><b>Come back here</b> and choose the downloaded file. It's added straight away.
+   <label class="btn" style="display:flex;align-items:center;justify-content:center;margin-top:6px">Choose the downloaded file<input type="file" id="imp-file" accept=".csv,.txt,text/csv,text/plain" class="sr"></label></li>
+ </ol>
+ <label>Name for this list (optional)<input type="text" id="imp-name" placeholder="Uses the playlist's own name"></label>
+ <p class="snote">Also works with a CSV from exportify.app.</p>
  <p id="imp-msg" role="status"></p>
  <p class="snote">Imported lists are saved on this device only.</p></div></div>
  <div class="ft"><button class="btn primary" id="set-ok" autofocus>Done</button></div>
@@ -438,15 +447,19 @@ function renderList(){const genres=["All",...[...new Set(songSource().map(x=>x.g
 // "Future;Juice WRLD" -> "Future & Juice WRLD" (keeps every credited artist; commas only split when there's no ";")
 function joinArtists(s){const A=String(s).split(String(s).includes(";")?/\s*;\s*/:/\s*\|\s*/).map(x=>x.trim()).filter(Boolean);return A.length>1?A.slice(0,-1).join(", ")+" & "+A[A.length-1]:(A[0]||"")}
 function parseCSV(text){
+  const sep=text.split("\n")[0].includes("\t")?"\t":",";   // Apple Music's own export is tab-separated
   const rows=[];let row=[],f="",q=false;for(let i=0;i<text.length;i++){const c=text[i];
     if(q){if(c==='"'){if(text[i+1]==='"'){f+='"';i++}else q=false}else f+=c}
-    else if(c==='"')q=true;else if(c===","){row.push(f);f=""}else if(c==="\n"||c==="\r"){if(c==="\r"&&text[i+1]==="\n")i++;row.push(f);rows.push(row);row=[];f=""}else f+=c}
+    else if(c==='"')q=true;else if(c===sep){row.push(f);f=""}else if(c==="\n"||c==="\r"){if(c==="\r"&&text[i+1]==="\n")i++;row.push(f);rows.push(row);row=[];f=""}else f+=c}
   if(f||row.length){row.push(f);rows.push(row)}
   if(rows.length<2)return[];const H=rows[0].map(x=>x.replace(/^﻿/,"").toLowerCase().trim());
   const col=(...k)=>H.findIndex(h=>k.some(x=>h.includes(x)));
   const ti=col("track name","title","song","name"),ai=col("artist"),yi=col("release date","year","date"),gi=col("genre");
   if(ti<0||ai<0)return[];
-  return rows.slice(1).filter(r=>r[ti]&&r[ai]).map(r=>({t:r[ti].trim(),a:joinArtists(r[ai]),y:yi>=0?parseInt(r[yi])||0:0,g:gi>=0&&r[gi]?r[gi].split(/[;,]/)[0].trim().replace(/\b\w/g,m=>m.toUpperCase()):""}));
+  const pi=H.findIndex(h=>h.includes("playlist"));
+  const out=rows.slice(1).filter(r=>r[ti]&&r[ai]).map(r=>({t:r[ti].trim(),a:joinArtists(r[ai]),y:yi>=0?parseInt(r[yi])||0:0,g:gi>=0&&r[gi]?r[gi].split(/[;,]/)[0].trim().replace(/\b\w/g,m=>m.toUpperCase()):""}));
+  if(pi>=0&&rows[1]&&rows[1][pi])out.playlist=rows[1][pi].trim();
+  return out;
 }
 function changed(){ensureOneOn();save("sd_cfg",CFG);srcCache=null;round=null;nextSong=null;renderSettings();render()}
 function renderSettings(){ensureOneOn();
@@ -461,10 +474,16 @@ function renderSettings(){ensureOneOn();
   $("#lists").querySelectorAll(".sopt").forEach(c=>c.onclick=()=>{CFG.on[c.dataset.id]=!listOn(c.dataset.id);changed()});
   $("#lists").querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>{const id=b.dataset.del;if(!confirm("Remove this list from this device?"))return;
     IMPORTS=IMPORTS.filter(x=>"u:"+x.id!==id);delete CFG.on[id];save("sd_imports",IMPORTS);changed()})}
+$("#imp-go").onclick=async()=>{const v=$("#imp-link").value.trim(),m=$("#imp-linkmsg");
+  const src=/spotify\.com|spotify\.link/i.test(v)?"Spotify":/music\.apple\.com/i.test(v)?"Apple Music":"";
+  if(!src){m.textContent="Paste a Spotify or Apple Music playlist link first.";return}
+  $("#imp-src").innerHTML="<b>"+src+"</b>";
+  try{await navigator.clipboard.writeText(v);m.textContent="Link copied. Paste it on TuneMyMusic."}catch(e){m.textContent="Copy the link above, then paste it on TuneMyMusic."}
+  window.open("https://www.tunemymusic.com/transfer","_blank","noopener")};
 $("#imp-file").onchange=e=>{const file=e.target.files[0];if(!file)return;const r=new FileReader();
   r.onload=()=>{const songs=parseCSV(String(r.result));e.target.value="";
     if(!songs.length){$("#imp-msg").textContent="Sorry, that file doesn't look like a playlist. It needs song names and artists.";return}
-    const name=$("#imp-name").value.trim()||file.name.replace(/\.csv$/i,"");const id=Date.now().toString(36);
+    const name=$("#imp-name").value.trim()||songs.playlist||file.name.replace(/\.(csv|txt)$/i,"").replace(/^tunemymusic.*$/i,"My playlist");const id=Date.now().toString(36);
     IMPORTS.push({id,name,songs});CFG.on["u:"+id]=true;save("sd_imports",IMPORTS);CFG.genre="All";$("#imp-name").value="";
     changed();$("#imp-msg").textContent=`Added "${name}" with ${songs.length} songs.`};
   r.readAsText(file)};

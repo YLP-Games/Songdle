@@ -181,6 +181,23 @@ async function stub(page, opts = {}) {
       ok(got.includes(want), `Typing "${q}" suggests ${want}`);
     }
 
+    // ---------- TuneMyMusic link flow + its CSV ----------
+    const p7 = await browser.newPage(); await stub(p7); await p7.goto("http://localhost:8123/"); await p7.click("#how-ok");
+    await p7.waitForFunction(() => Object.keys(BUILTIN).length);
+    await p7.click("#gear");
+    let opened = null; p7.context().on("page", pg => { opened = pg.url() });
+    await p7.fill("#imp-link", "https://open.spotify.com/playlist/37i9dQZF1DXbTxeAdrVG2l"); await p7.click("#imp-go");
+    await p7.waitForTimeout(500);
+    ok((await p7.textContent("#imp-src")) === "Spotify", "Link is recognised as Spotify");
+    const tmm = 'Track name,Artist name,Album,Playlist name,Type,ISRC\n"Waterloo",ABBA,Waterloo,Mum & Dad Hits,Playlist,X\n"Jolene","Dolly Parton",Jolene,Mum & Dad Hits,Playlist,Y\n';
+    await p7.setInputFiles("#imp-file", { name: "TuneMyMusic_Mum.csv", mimeType: "text/csv", buffer: Buffer.from(tmm) });
+    await p7.waitForFunction(() => document.querySelector("#imp-msg").textContent.includes("Added"));
+    ok((await p7.textContent("#imp-msg")).includes('"Mum & Dad Hits" with 2 songs'), "TuneMyMusic CSV imports with the playlist's own name");
+    const tsv = "Name\tArtist\tComposer\tAlbum\tGenre\tYear\nVolare\tDean Martin\t\tX\tPop\t1958\n";
+    await p7.setInputFiles("#imp-file", { name: "Favourites.txt", mimeType: "text/plain", buffer: Buffer.from(tsv) });
+    await p7.waitForFunction(() => document.querySelector("#imp-msg").textContent.includes("Favourites"));
+    ok(await p7.evaluate(() => songSource().some(x => x.t === "Volare" && x.y === 1958)), "Apple Music's own tab-separated export imports too");
+
     // ---------- First clip length setting ----------
     const p6 = await browser.newPage(); await stub(p6); await p6.goto("http://localhost:8123/"); await p6.click("#how-ok");
     await p6.waitForSelector("#play:not([disabled])");
