@@ -46,12 +46,14 @@ select,.lt input{background:var(--panel2);color:var(--fg);border:1px solid var(-
 .sg-side{min-width:120px;min-height:58px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:10px 14px}
 span.sg-side{visibility:hidden}
 .sg-side small{font:600 12px var(--mono);color:var(--muted)}
-.sg-play{width:88px;height:88px;flex:none;border-radius:50%;border:0;background:var(--accent);color:var(--on-accent);cursor:pointer;display:grid;place-items:center;box-shadow:0 0 0 6px color-mix(in srgb,var(--accent) 22%,transparent)}
+.sg-play{position:relative;width:88px;height:88px;flex:none;border-radius:50%;border:0;background:var(--accent);color:var(--on-accent);cursor:pointer;display:grid;place-items:center;box-shadow:0 0 0 6px color-mix(in srgb,var(--accent) 22%,transparent)}
 .sg-play:disabled{opacity:.45;cursor:default}
 .sg-play svg{width:38px;height:38px;margin-left:4px}
-.sg-play.playing{animation:pulse 1s ease-in-out infinite}
+/* The pulse fades a ring in and out (opacity only, so phones don't repaint the button every frame) */
+.sg-play::after{content:"";position:absolute;inset:-14px;border-radius:50%;border:8px solid color-mix(in srgb,var(--accent) 10%,transparent);opacity:0;pointer-events:none}
+.sg-play.playing::after{animation:pulse 1s ease-in-out infinite}
 .sg-play .i-pause{display:none;margin-left:0}.sg-play.playing .i-pause{display:block}.sg-play.playing .i-play{display:none}
-@keyframes pulse{50%{box-shadow:0 0 0 14px color-mix(in srgb,var(--accent) 10%,transparent)}}
+@keyframes pulse{50%{opacity:1}}
 .sg-vol{display:flex;align-items:center;gap:8px;color:var(--muted);font:600 14px var(--mono)}
 .sg-vol svg{width:22px;height:22px}
 .sg-vol input{width:min(240px,50vw);height:32px;accent-color:var(--accent);cursor:pointer}
@@ -127,7 +129,7 @@ dialog .ft{display:flex;justify-content:flex-end;padding:12px 18px;border-top:1p
 @media (max-width:600px){body{font-size:16px}.stage{padding:14px 12px}.sg-controls{gap:10px}.sg-side{min-width:0;flex:1;padding:10px 8px}
  .top{flex-wrap:nowrap;gap:6px}.tabs{flex-wrap:nowrap;gap:5px}.tab{flex:1;padding:8px 6px;font-size:14px;line-height:1.15}.gearbtn{min-width:44px;padding:6px}.gearbtn span{display:none}.win{flex-direction:column;text-align:center}.win .actions{justify-content:center}
  .bar .search{flex:1 1 100%}.bar .btn{flex:1}.sg-row span{font-size:14px;padding:8px 5px}}
-@media (prefers-reduced-motion:reduce){.sg-play.playing,.sg-row.new span{animation:none}}
+@media (prefers-reduced-motion:reduce){.sg-play.playing::after,.sg-row.new span{animation:none}}
 .sg-links{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}.sg-links span{font-size:14px;color:var(--muted);width:100%}.sg-links .btn{text-decoration:none;display:inline-flex;align-items:center;min-height:44px;padding:8px 16px}
 </style>
 </head>
@@ -300,9 +302,55 @@ function shareText(st,t){const sq=st.guesses.map(g=>g.skip?"⬛":g.k===t.k?"🟩
 /* ---------- Audio (scrubber from Yahyadle's Songdle) ---------- */
 let audio=null,timer=null,raf=0,ctx=null;
 let vol=load("sd_vol",0.8);if(!(vol>=0&&vol<=1))vol=0.8;
-// iPhones ignore a page's volume (only the side buttons change it), so the slider is left out there
-const VOLOK=(()=>{try{const a=new Audio();a.volume=0.5;return a.volume===0.5}catch(e){return false}})();
-const preAudio={};
+// Clips play from memory through Web Audio: the whole preview (about 1MB) is downloaded and decoded before Play is
+// enabled, then each clip starts and stops on the exact sample with a few ms fade. A plain <audio> element streams,
+// seeks and is stopped by a timer, which can stutter, click, or cut a 0.1s clip off before it's heard (phones and
+// Bluetooth headphones start sound late). iPhones only let Web Audio past the silent switch with
+// navigator.audioSession (iOS 16.4+), so older ones keep <audio>, as does anything that can't decode the file.
+const AC=window.AudioContext||window.webkitAudioContext;
+const WA=!!AC&&!((IOS||navigator.maxTouchPoints>1&&/Macintosh/.test(navigator.userAgent))&&!navigator.audioSession);   // iPads say "Macintosh"
+let ac=null;
+const actx=()=>ac||(ac=new AC());
+// Web Audio starts paused until a tap: wake it on the first one (on touchscreens a tap counts when the finger lifts)
+function unlock(){const a=actx();try{if(navigator.audioSession)navigator.audioSession.type="playback"}catch(e){}if(a.state!=="running")a.resume().catch(()=>{})}
+if(WA)for(const t of["pointerdown","pointerup","keydown"])document.addEventListener(t,unlock,true);
+const FADE=0.004;
+// The parts of an <audio> element the game uses (src, paused, currentTime, duration, volume, play, pause, onended),
+// plus until(t): where in the song to stop, which Skip moves on without a gap in the sound
+class Clip{
+  constructor(src,buf){const a=actx();this.src=src;this.buf=buf;this.duration=buf.duration;this.readyState=4;this.onended=this.onloadedmetadata=null;
+    this.out=a.createGain();this.out.gain.value=vol;this.out.connect(a.destination);this.node=null;this.pos=0;this.t0=0;this.lim=Infinity;this.tm=0}
+  get paused(){return!this.node}
+  get currentTime(){return this.node?Math.min(this.pos+actx().currentTime-this.t0,this.end()):this.pos}
+  set currentTime(t){const on=!!this.node;this.halt();this.pos=Math.max(0,Math.min(+t||0,this.duration));if(on)this.start()}
+  get volume(){return this.out.gain.value}
+  set volume(v){this.out.gain.setTargetAtTime(v,actx().currentTime,0.02)}
+  end(){return Math.min(this.lim,this.duration)}
+  until(t){this.lim=t;if(this.node)this.schedule()}
+  play(){unlock();if(!this.node){if(this.pos>=this.end()-0.01)this.pos=0;this.start()}const a=actx();return a.state==="running"?Promise.resolve():a.resume()}
+  pause(){this.halt()}
+  start(){const a=actx(),n=a.createBufferSource(),gi=a.createGain(),go=a.createGain(),now=a.currentTime;
+    n.buffer=this.buf;n.connect(gi).connect(go).connect(this.out);
+    gi.gain.setValueAtTime(0,now);gi.gain.linearRampToValueAtTime(1,now+FADE);
+    n.start(now,this.pos);Object.assign(this,{node:n,go,t0:now});n.onended=()=>{if(this.node===n)this.done()};this.schedule()}
+  // Fade out to silence exactly at the end point, on the audio clock (timers on the page can run late)
+  schedule(){const now=actx().currentTime,g=this.go.gain,at=this.t0+this.end()-this.pos,f=Math.min(0.012,(at-this.t0)/4);
+    clearTimeout(this.tm);g.cancelScheduledValues(now);g.setValueAtTime(g.value,now);g.linearRampToValueAtTime(1,now+FADE);
+    if(at-f>now+FADE)g.setValueAtTime(1,at-f);g.linearRampToValueAtTime(0,Math.max(at,now+FADE));
+    this.tm=setTimeout(()=>{if(this.node)this.done()},Math.max(0,at-now)*1000+50)}
+  done(){const n=this.node;this.pos=this.end();this.node=null;clearTimeout(this.tm);try{n.stop()}catch(e){}if(this.onended)this.onended()}
+  halt(){const n=this.node;if(!n)return;this.pos=this.currentTime;this.node=null;clearTimeout(this.tm);
+    const now=actx().currentTime,g=this.go.gain;g.cancelScheduledValues(now);g.setValueAtTime(g.value,now);g.linearRampToValueAtTime(0,now+0.01);try{n.stop(now+0.012)}catch(e){}}
+}
+// A ready-to-play clip for this preview: decoded in memory when possible, else an <audio> element. The last few are
+// kept (the current song and the prefetched next one); each decoded preview takes about 10MB.
+const players={};
+function player(url){if(players[url])return players[url];
+  const ks=Object.keys(players);if(ks.length>=3)delete players[ks[0]];
+  return players[url]=(WA?fetch(url).then(r=>{if(!r.ok)throw new Error("HTTP "+r.status);return r.arrayBuffer()}).then(b=>actx().decodeAudioData(b)).then(buf=>new Clip(url,buf)):Promise.reject())
+    .catch(()=>{const a=new Audio(url);a.preload="auto";return a})}
+// The volume slider works with Web Audio everywhere; an <audio> element's volume is fixed on iPhones (side buttons only)
+const VOLOK=WA||(()=>{try{const a=new Audio();a.volume=0.5;return a.volume===0.5}catch(e){return false}})();
 function stop(){if(timer){clearTimeout(timer);timer=null}cancelAnimationFrame(raf);
   if(audio&&!audio.paused&&ctx)ctx.st.pos=Math.min(audio.currentTime,ctx.limit);
   if(audio)audio.pause();const b=$("#play");if(b){b.classList.remove("playing");b.setAttribute("aria-label","Play")}draw()}
@@ -313,13 +361,13 @@ function draw(){const sc=$("#sg-scrub");if(!sc||!ctx)return;const {st,limit,tota
 function keepPlaying(){const c=ctx;const b=$("#play");if(b){b.classList.add("playing");b.setAttribute("aria-label","Pause")}
   const end=()=>{if(ctx!==c)return;if(timer){clearTimeout(timer);timer=null}cancelAnimationFrame(raf);audio.pause();c.st.pos=c.limit;stop()};
   const tick=()=>{if(!audio||audio.paused||ctx!==c)return;if(audio.currentTime>=c.limit)return end();draw();raf=requestAnimationFrame(tick)};
-  audio.onended=end;timer=setTimeout(end,Math.max(0,(c.limit-audio.currentTime)*1000));raf=requestAnimationFrame(tick)}
+  if(audio.until)audio.until(c.limit);audio.onended=end;timer=setTimeout(end,Math.max(0,(c.limit-audio.currentTime)*1000));raf=requestAnimationFrame(tick)}
 function play(){if(!audio||!ctx)return;stop();const c=ctx,st=c.st;
   if((st.pos||0)>=c.limit-0.02)st.pos=0;try{audio.currentTime=st.pos||0}catch(e){}
   const b=$("#play");if(b){b.classList.add("playing");b.setAttribute("aria-label","Pause")}
   const end=()=>{if(ctx!==c)return;cancelAnimationFrame(raf);if(timer){clearTimeout(timer);timer=null}if(audio)audio.pause();st.pos=c.limit;stop()};
   const tick=()=>{if(!audio||audio.paused||ctx!==c)return;if(audio.currentTime>=c.limit)return end();draw();raf=requestAnimationFrame(tick)};
-  audio.onended=end;
+  audio.onended=end;if(audio.until)audio.until(c.limit);
   // Time the stop from when sound actually starts, so a 0.1s clip really is 0.1s
   Promise.resolve(audio.play()).then(()=>{if(ctx!==c||audio.paused)return;timer=setTimeout(end,Math.max(0,(c.limit-audio.currentTime)*1000));raf=requestAnimationFrame(tick)}).catch(()=>stop())}
 
@@ -330,7 +378,7 @@ function pick(pool){const recent=load("sd_recent",[]);let c=pool.filter(x=>!rece
   const s=c[Math.floor(Math.random()*c.length)];recent.push(s.k);while(recent.length>Math.min(150,Math.floor(pool.length*0.6)))recent.shift();save("sd_recent",recent);return s}
 function newRound(){const pool=songPool();let t=nextSong&&pool.find(x=>x.k===nextSong.k);nextSong=null;return{target:t||(pool.length?pick(pool):null),guesses:[],done:false,won:false}}
 function prefetch(){if(nextSong)return;const pool=songPool();if(pool.length<2)return;nextSong=pick(pool);
-  findPreview(nextSong).then(p=>{if(!p||preAudio[p.url])return;const ks=Object.keys(preAudio);if(ks.length>=3)delete preAudio[ks[0]];const a=new Audio(p.url);a.preload="auto";preAudio[p.url]=a}).catch(()=>{})}
+  findPreview(nextSong).then(p=>{if(p)player(p.url)}).catch(()=>{})}
 
 // Skip keeps the music going: render() leaves the audio playing and the new round view picks it up
 let carry=false;
@@ -386,13 +434,15 @@ ${daily?`<div class="actions"><button class="btn primary" id="share">Copy my sco
     if(!p){// No clip: quietly deal another before anyone has guessed
       if(!daily&&st===round&&!st.done&&!st.guesses.length&&(st.auto||0)<6){const n=newRound();n.auto=(st.auto||0)+1;round=n;render();return}
       status.textContent="No preview found for this song."+(st.done||daily?"":" Press Give up to get another one.");return}
-    {const keep=audio&&audio.src===p.url;if(audio&&!keep)audio.pause();audio=keep?audio:preAudio[p.url]||new Audio(p.url)}delete preAudio[p.url];audio.preload="auto";audio.volume=vol;pb.disabled=false;
+    // Play only once the whole clip is ready, so it never stops to buffer (the song already playing on a Skip stays)
+    return(audio&&audio.src===p.url?Promise.resolve(audio):player(p.url)).then(pl=>{if(pb!==$("#play"))return;
+    if(audio&&audio!==pl)audio.pause();audio=pl;audio.preload="auto";audio.volume=vol;pb.disabled=false;
     const going=carry&&!st.done&&!audio.paused;carry=false;
     status.textContent=(st.done?"Full preview":"Clip: "+len+"s")+(going?" · playing":" · press play");if(going)keepPlaying();
     audio.onloadedmetadata=()=>{if(st.done&&ctx&&ctx.st===st&&isFinite(audio.duration)){ctx.limit=ctx.total=audio.duration;draw()}};if(audio.readyState>=1)audio.onloadedmetadata();
     if(!st.done&&!daily)(audio.readyState>=3?setTimeout(prefetch,300):audio.addEventListener("canplaythrough",prefetch,{once:true}));
     if(st.done){const a=$("#art");if(a&&p.art){a.src=p.art;a.hidden=false}const lk=$("#lk-am");if(lk&&p.link)lk.href=p.link;
-      if(st.won&&!st.autoplayed){st.autoplayed=true;if(daily)saveDaily(st);status.textContent="Full preview · playing";st.pos=0;play()}}
+      if(st.won&&!st.autoplayed){st.autoplayed=true;if(daily)saveDaily(st);status.textContent="Full preview · playing";st.pos=0;play()}}})
   }).catch(e=>{console.error(e);if(!$("#play")||pb!==$("#play"))return;
     // Before any guesses, quietly try another song; after that, offer a retry
     if(!daily&&st===round&&!st.done&&!st.guesses.length&&(st.auto||0)<4){const n=newRound();n.auto=(st.auto||0)+1;round=n;render();return}
@@ -420,7 +470,8 @@ ${daily?`<div class="actions"><button class="btn primary" id="share">Copy my sco
   $("#skip").onclick=()=>{const playing=!!(audio&&!audio.paused);
     // Carry on from where the clip got to (or where it stopped), straight into the longer clip
     if(!CFG.flow){stop();st.guesses.push({skip:1});after();return}
-    st.pos=playing?audio.currentTime:(st.pos||0);st.keepPos=true;carry=playing&&st.guesses.length+1<CLIPS.length;if(playing&&!carry)stop();st.guesses.push({skip:1});after()};
+    st.pos=playing?audio.currentTime:(st.pos||0);st.keepPos=true;carry=playing&&st.guesses.length+1<CLIPS.length;if(playing&&!carry)stop();st.guesses.push({skip:1});
+    if(carry&&audio.until)audio.until(CLIPS[st.guesses.length]);after()};
   // Guess from every switched-on song (always including the answer)
   const pool=songSource().slice();if(!pool.some(x=>x.k===t.k))pool.push(t);
   const used=new Set(st.guesses.map(g=>g.k));

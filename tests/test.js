@@ -45,9 +45,10 @@ async function stub(page, opts = {}) {
   // Answer byte ranges like a real CDN, so the player can seek
   await page.route("https://audio.test/**", r => {
     const m = /bytes=(\d+)-(\d*)/.exec(r.request().headers()["range"] || "");
-    if (!m) return r.fulfill({ contentType: "audio/wav", headers: { "accept-ranges": "bytes" }, body: WAV });
+    const cors = { "access-control-allow-origin": "*" };   // like the real CDNs, so the game can fetch and decode clips
+    if (!m) return r.fulfill({ contentType: "audio/wav", headers: { "accept-ranges": "bytes", ...cors }, body: WAV });
     const s = +m[1], e = m[2] ? +m[2] : WAV.length - 1;
-    r.fulfill({ status: 206, contentType: "audio/wav", headers: { "accept-ranges": "bytes", "content-range": `bytes ${s}-${e}/${WAV.length}` }, body: WAV.subarray(s, e + 1) });
+    r.fulfill({ status: 206, contentType: "audio/wav", headers: { "accept-ranges": "bytes", "content-range": `bytes ${s}-${e}/${WAV.length}`, ...cors }, body: WAV.subarray(s, e + 1) });
   });
 }
 
@@ -220,6 +221,43 @@ async function stub(page, opts = {}) {
     await p6.click("#gear"); await p6.click('#flowseg [data-flow="true"]'); await p6.click("#set-ok");
     await p6.reload(); await p6.waitForSelector("#play:not([disabled])");
     ok(await p6.evaluate(() => ctx.limit === 2), "Start length remembered after reload");
+
+    // ---------- Clips play from memory and sound for exactly as long as they should ----------
+    {
+      const p = await browser.newPage(); await stub(p); await p.goto("http://localhost:8123/"); await p.click("#how-ok");
+      await p.waitForSelector("#play:not([disabled])");
+      ok(await p.evaluate(() => audio instanceof Clip && audio.buf.duration > 29), "Clips are downloaded, decoded and played through Web Audio");
+      // Listen to what comes out, on the audio thread: when sound starts and stops, and the longest silence in between
+      const listen = () => p.evaluate(async () => { const a = actx();
+        if (!window.ear) await a.audioWorklet.addModule(URL.createObjectURL(new Blob([`registerProcessor("ear", class extends AudioWorkletProcessor {
+          constructor() { super(); this.i = 0; this.h = { first: -1, last: -1, gap: 0, quiet: 0 }; this.port.onmessage = () => this.port.postMessage(this.h) }
+          process(inp) { const c = inp[0] && inp[0][0], h = this.h;
+            for (let k = 0; k < 128; k++, this.i++) { if (c && Math.abs(c[k]) > 0.02) { if (h.first < 0) h.first = this.i; else h.gap = Math.max(h.gap, h.quiet); h.last = this.i; h.quiet = 0 } else if (h.first >= 0) h.quiet++ }
+            return true } })`], { type: "text/javascript" })));
+        if (window.ear) window.ear.disconnect();
+        window.ear = new AudioWorkletNode(a, "ear"); audio.out.disconnect(); audio.out.connect(window.ear); window.ear.connect(a.destination) });
+      const heard = () => p.evaluate(() => new Promise(res => { window.ear.port.onmessage = e => { const r = actx().sampleRate, h = e.data; res({ secs: (h.last - h.first) / r, gap: h.gap / r }) }; window.ear.port.postMessage(0) }));
+      await listen(); await p.click("#play"); await p.waitForTimeout(600);
+      let h = await heard();
+      ok(Math.abs(h.secs - 0.1) < 0.012, "A 0.1s clip sounds for 0.1s (" + h.secs.toFixed(3) + "s)");
+      // Skip 50ms in: the sound carries straight on to 0.5s with no gap or restart
+      await listen();
+      await p.evaluate(() => { round.pos = 0; document.querySelector("#play").click(); setTimeout(() => document.querySelector("#skip").click(), 50) });
+      await p.waitForTimeout(1000);
+      h = await heard();
+      ok(Math.abs(h.secs - 0.5) < 0.012 && h.gap < 0.003, "Skip mid-clip carries on to 0.5s without a gap (" + h.secs.toFixed(3) + "s, longest gap " + (h.gap * 1000).toFixed(1) + "ms)");
+      ok(await p.evaluate(() => audio.paused && Math.abs(audio.currentTime - 0.5) < 0.001), "It stops exactly at the end of the longer clip");
+    }
+    // Play waits until the whole clip is ready, rather than starting while it's still downloading
+    {
+      const p = await browser.newPage(); await stub(p);
+      await p.route("https://audio.test/**", async r => { await new Promise(res => setTimeout(res, 1500)); r.fallback() });
+      await p.goto("http://localhost:8123/"); await p.click("#how-ok");
+      await p.waitForFunction(() => /loading/.test(document.querySelector("#status")?.textContent || ""));
+      ok(await p.isDisabled("#play"), "Play stays off while the clip downloads");
+      await p.waitForSelector("#play:not([disabled])", { timeout: 8000 });
+      ok((await p.textContent("#status")).includes("press play"), "…and comes on once it's ready");
+    }
 
     // ---------- iPhone: no iTunes search there, so songs without an iTunes ID get Deezer's clip ----------
     {

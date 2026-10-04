@@ -17,9 +17,12 @@ links bring in up to 100 songs. Added lists are saved on that device only.
 - `api/playlist.js`: reads a public Spotify or Apple Music playlist/album link for "Add your own songs" (browsers can't read those pages themselves). Runs on Vercel at `songdle-dusky.vercel.app`; redeploy with `vercel deploy --prod` (`.vercelignore` uploads only `api/`)
 - `tests/test.js`: Playwright checks (iTunes and Deezer stubbed, WAV audio)
 
-Clips come from iTunes previews. On iPhones and iPads Apple redirects iTunes *search* to the Music app, so only lookups by
-ID work there: every song in `playlists.json` should have an iTunes ID. Songs without one (e.g. from a Spotify link) get
-their clip from Deezer instead.
+Clips come from iTunes previews. Each preview is downloaded and decoded in full before Play lights up, then played through
+Web Audio, so even a 0.1s clip starts and stops exactly, with a few ms fade instead of a click (an `<audio>` element is the
+fallback, e.g. on iPhones before iOS 16.4, where Web Audio would go quiet with the silent switch on).
+
+On iPhones and iPads Apple redirects iTunes *search* to the Music app, so only lookups by ID work there: every song in
+`playlists.json` should have an iTunes ID. Songs without one (e.g. from a Spotify link) get their clip from Deezer instead.
 
 To add a playlist permanently, convert its CSV into a new key in `playlists.json`, then run `python3 tools/itunes_ids.py`.
 
