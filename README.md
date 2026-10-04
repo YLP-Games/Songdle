@@ -9,3 +9,5 @@ Based on the Songdle game in [Yahyadle](https://github.com/layla310803/Yahyadle)
 - `tests/test.js`: Playwright checks (`node tests/test.js`, iTunes stubbed, WAV audio)
 
 To add a playlist permanently, convert its CSV into a new key in `playlists.json`, then run `python3 tools/itunes_ids.py`.
+
+Every song in `playlists.json` should have an iTunes ID: on iPhones and iPads Apple redirects iTunes *search* to the Music app, so only lookups by ID work there. Songs without one get their clip from Deezer instead.

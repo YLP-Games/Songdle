@@ -214,7 +214,7 @@ function songSource(){
     if(!o.i&&r.i){o.i=r.i;o.c=r.c||""}if(!o.lists.includes(L.name))o.lists.push(L.name);if(+r.y&&(!o.y||+r.y<o.y))o.y=+r.y;if(!o.g&&r.g)o.g=r.g}}
   const out=[...m.values()];srcCache={sig,out};return out}
 function songPool(){const e=ERAS.find(x=>x[0]===CFG.era)||ERAS[0];
-  return songSource().filter(x=>(CFG.genre==="All"||x.g===CFG.genre)&&(e[0]==="All"||(x.y>=e[1]&&x.y<=e[2])))}
+  return songSource().filter(x=>(CFG.genre==="All"||x.g===CFG.genre)&&(e[0]==="All"||(x.y&&x.y>=e[1]&&x.y<=e[2])))}
 function applyYear(song,info){const y=info&&info.year;if(!y||(song.y&&song.y<=y))return false;song.y=y;YEARFIX[song.k]=y;save("sd_years",YEARFIX);return true}
 
 /* ---------- iTunes previews (JSONP, from Yahyadle) ---------- */
@@ -226,26 +226,49 @@ const jsonp2=url=>jsonp(url).catch(()=>new Promise(r=>setTimeout(r,800)).then(()
 const clean=s=>String(s).toLowerCase().replace(/\(.*?\)|\[.*?\]|feat\..*$/g,"").replace(/[^\p{L}\p{N}]+/gu," ").trim();
 const VARIANT=/\b(remix|edit|mix|version|slowed|sped|nightcore|live|acoustic|instrumental|cover|karaoke|rework|bootleg|vip|flip|mashup)\b/i;
 const FAKE=/karaoke|tribute|made famous|in the style of|originally performed|backing track|lullaby|8[- ]bit|music box|cover version|covers?\b|vitamin string|rockabye baby|twinkle twinkle|piano version|sped up|slowed/i;
+// On iPhones and iPads Apple answers iTunes *search* with a redirect to the Music app (musics://), which a page can't load.
+// Lookups by ID still work there; songs without an ID get their clip from Deezer instead (also used when iTunes has none).
+const IOS=/iPhone|iPad|iPod/.test(navigator.userAgent);
+const yearOf=r=>{const y=+String(r.releaseDate||"").slice(0,4);return y>1900?y:0};
 async function findPreview(song){
   if(song.k in prevCache)return prevCache[song.k];
   const art=r=>(r.artworkUrl100||"").replace("100x100","300x300");
   if(song.i){try{const d=await jsonp2("https://itunes.apple.com/lookup?id="+song.i+"&country="+(song.c||"US"));const r=(d.results||[]).find(x=>x.previewUrl);
-    if(r)return prevCache[song.k]={url:r.previewUrl,art:art(r),link:r.trackViewUrl,year:0}}catch(e){}}
+    if(r)return prevCache[song.k]={url:r.previewUrl,art:art(r),link:r.trackViewUrl,year:song.y?0:yearOf(r)}}catch(e){}}
   const own=VARIANT.test(song.t)||FAKE.test(song.t),variant=n=>!own&&VARIANT.test(n);
   const who=[...artistSet(song.a,song.t)].map(clean).filter(x=>x.length>1);
   const byArtist=x=>{const an=clean(x.artistName);return who.some(w=>an.includes(w)||(an.length>2&&w.includes(an)))};
   const genuine=x=>own||!(variant(x.trackName)||FAKE.test(x.trackName+" | "+x.artistName+" | "+(x.collectionName||"")));
   const oldest=L=>L.slice().sort((p,q)=>String(p.releaseDate||"9").localeCompare(String(q.releaseDate||"9")))[0]||null;
-  const t=clean(song.t);let best=null,fails=0;const yrs=[];
-  for(const country of ["US","GB"]){
-    let d;try{d=await jsonp2("https://itunes.apple.com/search?media=music&entity=song&limit=50&country="+country+"&term="+encodeURIComponent(song.a+" "+song.t))}catch(e){fails++;continue}
+  const t=clean(song.t);let best=null,reached=false;const yrs=[];
+  if(!IOS)for(const country of ["US","GB"]){
+    let d;try{d=await jsonp2("https://itunes.apple.com/search?media=music&entity=song&limit=50&country="+country+"&term="+encodeURIComponent(song.a+" "+song.t));reached=true}catch(e){continue}
     const all=(d.results||[]).filter(x=>byArtist(x)&&genuine(x)),r=all.filter(x=>x.previewUrl);
-    yrs.push(...all.filter(x=>(clean(x.trackName)===t||clean(x.trackName).startsWith(t+" "))&&x.releaseDate).map(x=>+String(x.releaseDate).slice(0,4)).filter(y=>y>1900));
+    yrs.push(...all.filter(x=>(clean(x.trackName)===t||clean(x.trackName).startsWith(t+" "))&&x.releaseDate).map(yearOf).filter(Boolean));
     best=oldest(r.filter(x=>clean(x.trackName)===t))||oldest(r.filter(x=>clean(x.trackName).startsWith(t+" ")))||null;
     if(best)break}
-  const year=yrs.length?Math.min(...yrs):0;
-  if(!best&&fails===2)throw new Error("offline");   // couldn't ask Apple at all: don't remember this song as "no preview"
-  return prevCache[song.k]=best?{url:best.previewUrl,art:art(best),link:best.trackViewUrl,year}:null}
+  if(best)return prevCache[song.k]={url:best.previewUrl,art:art(best),link:best.trackViewUrl,year:yrs.length?Math.min(...yrs):0};
+  let dz;try{dz=await deezer(song,t,x=>byArtist(x)&&genuine(x));reached=true}catch(e){}
+  if(dz)return prevCache[song.k]=dz;
+  if(!reached)throw new Error("offline");   // couldn't ask anyone at all: don't remember this song as "no preview"
+  return dz===null?prevCache[song.k]=null:null}
+// Deezer's 30s previews, put through the same checks as iTunes results (right singer, not a live/karaoke/cover version).
+// Deezer often names the main version "(Radio Edit)" or "(2011 Remaster)": those count as the song itself.
+const SAME=/\s*(?:[(\[]|-\s)\s*(?:radio edit|single version|album version|original version|(?:\d{4} )?remaster(?:ed)?(?: \d{4})?(?: version)?|mono|stereo)\s*[)\]]?/gi;
+async function deezer(song,t,ok){
+  const d=await jsonp2("https://api.deezer.com/search?output=jsonp&limit=50&q="+encodeURIComponent(song.a+" "+song.t));
+  if(d.error)throw new Error("deezer: "+(d.error.message||d.error.type));
+  const all=(d.data||[]).filter(x=>x.preview&&x.readable!==false&&x.artist)
+    .map(x=>({trackName:x.title.replace(SAME,""),artistName:x.artist.name,collectionName:x.album?x.album.title:"",x})).filter(ok);
+  const exact=all.filter(r=>clean(r.trackName)===t),near=exact.length?exact:all.filter(r=>clean(r.trackName).startsWith(t+" "));
+  const r=near[0];if(!r)return null;
+  // Search results have no dates: the year is the earliest of the matching albums' release dates and the recordings'
+  // ISRC years (the 2 digits after the country and label code), as compilations often come first
+  let year=0;if(!song.y){const ids=[...new Set(near.map(r=>r.x.album&&r.x.album.id).filter(Boolean))].slice(0,4);
+    const ys=(await Promise.all(ids.map(id=>jsonp("https://api.deezer.com/album/"+id+"?output=jsonp").then(a=>yearOf({releaseDate:a.release_date}),()=>0)))).filter(Boolean);
+    for(const r of near){const m=/^[A-Z]{2}[A-Z0-9]{3}(\d\d)\d{5}$/.exec(r.x.isrc||"");if(m)ys.push(+m[1]+(+m[1]>new Date().getFullYear()%100?1900:2000))}
+    if(ys.length)year=Math.min(...ys)}
+  return{url:r.x.preview,art:r.x.album&&r.x.album.cover_medium||"",link:r.x.link||"",year}}
 
 /* ---------- Stats ---------- */
 const STATS=Object.assign({w:0,streak:0,best:0},load("sd_stats",{}));
@@ -269,6 +292,8 @@ function shareText(st,t){const sq=st.guesses.map(g=>g.skip?"⬛":g.k===t.k?"🟩
 /* ---------- Audio (scrubber from Yahyadle's Songdle) ---------- */
 let audio=null,timer=null,raf=0,ctx=null;
 let vol=load("sd_vol",0.8);if(!(vol>=0&&vol<=1))vol=0.8;
+// iPhones ignore a page's volume (only the side buttons change it), so the slider is left out there
+const VOLOK=(()=>{try{const a=new Audio();a.volume=0.5;return a.volume===0.5}catch(e){return false}})();
 const preAudio={};
 function stop(){if(timer){clearTimeout(timer);timer=null}cancelAnimationFrame(raf);
   if(audio&&!audio.paused&&ctx)ctx.st.pos=Math.min(audio.currentTime,ctx.limit);
@@ -326,7 +351,7 @@ function renderGame(st){
   h+=`<div class="sg-player"><div class="sg-controls">${st.done?`<span class="sg-side"></span>`:`<button class="btn sg-side" id="skip">Skip<small>+${CLIPS[Math.min(step+1,CLIPS.length-1)]}s</small></button>`}
     <button class="sg-play" id="play" aria-label="Play" disabled>${PLAYSVG}</button>
     ${st.done&&!daily?`<button class="btn primary sg-side" id="next">Next song</button>`:`<span class="sg-side"></span>`}</div>
-    <label class="sg-vol" for="vol">${VOLSVG}<span class="sr">Volume</span><input type="range" id="vol" min="0" max="100" step="1" value="${Math.round(vol*100)}" aria-label="Volume"><output id="vol-out">${Math.round(vol*100)}%</output></label>
+    ${VOLOK?`<label class="sg-vol" for="vol">${VOLSVG}<span class="sr">Volume</span><input type="range" id="vol" min="0" max="100" step="1" value="${Math.round(vol*100)}" aria-label="Volume"><output id="vol-out">${Math.round(vol*100)}%</output></label>`:""}
     <div class="sg-scrub" id="sg-scrub" role="slider" tabindex="0" aria-label="Position in the clip" aria-valuemin="0" style="--open:${limit/total*100}%;--pos:0%">
       <div class="sg-track"><div class="sg-open"></div><div class="sg-fill"></div>${st.done?"":CLIPS.slice(0,-1).map(c=>`<i style="left:${c/total*100}%"></i>`).join("")}<div class="sg-knob"></div></div>
       <div class="sg-tip"><span id="sg-pos">0.0s</span></div><span class="sg-end">${st.done?"":limit+"s of "+total+"s"}</span></div>
@@ -366,7 +391,7 @@ ${daily?`<div class="actions"><button class="btn primary" id="share">Copy my sco
     status.innerHTML=`Couldn't load the music. Check the internet connection.<small style="display:block;opacity:.6;font-size:11px">(${esc(String(e&&(e.message||e)).slice(0,120))})</small> <button class="btn" id="retry" style="min-height:40px;padding:6px 14px;margin-left:6px">Try again</button>`;
     $("#retry").onclick=()=>render()});
   pb.onclick=()=>{if(audio&&!audio.paused)stop();else play()};
-  $("#vol").oninput=e=>{vol=e.target.value/100;if(audio)audio.volume=vol;$("#vol-out").textContent=e.target.value+"%";save("sd_vol",vol)};
+  if(VOLOK)$("#vol").oninput=e=>{vol=e.target.value/100;if(audio)audio.volume=vol;$("#vol-out").textContent=e.target.value+"%";save("sd_vol",vol)};
   // Drag or tap the bar to move within the unlocked part
   const sc=$("#sg-scrub"),track=sc.querySelector(".sg-track");let drag=false,resume=false;
   const at=e=>{const r=track.getBoundingClientRect();return Math.max(0,Math.min(ctx.limit,(e.clientX-r.left)/r.width*ctx.total))};
@@ -427,7 +452,7 @@ function renderList(){const genres=["All",...[...new Set(songSource().map(x=>x.g
    <select id="le" aria-label="Era">${ERAS.map(e=>`<option value="${e[0]}"${LV.era===e[0]?" selected":""}>${e[0]==="All"?"All eras":e[0]}</option>`).join("")}</select></div>
    <p id="lcount" class="meta" style="margin-bottom:8px"></p><div class="listwrap"><table class="list"><thead><tr><th>Song</th><th>Artist</th><th>Year</th><th>Genre</th></tr></thead><tbody id="lbody"></tbody></table></div>`;
   const fill=()=>{const e=ERAS.find(x=>x[0]===LV.era)||ERAS[0],q=clean(LV.q);
-    const rows=songSource().filter(x=>(LV.genre==="All"||x.g===LV.genre)&&(e[0]==="All"||(x.y>=e[1]&&x.y<=e[2]))&&(!q||clean(x.t+" "+x.a).includes(q))).sort((a,b)=>a.t.localeCompare(b.t));
+    const rows=songSource().filter(x=>(LV.genre==="All"||x.g===LV.genre)&&(e[0]==="All"||(x.y&&x.y>=e[1]&&x.y<=e[2]))&&(!q||clean(x.t+" "+x.a).includes(q))).sort((a,b)=>a.t.localeCompare(b.t));
     $("#lcount").textContent=rows.length+" song"+(rows.length===1?"":"s");
     $("#lbody").innerHTML=rows.map(x=>`<tr><td>${esc(x.t)}${allLists().filter(l=>listOn(l.id)).length>1?`<small>${esc(x.lists.join(", "))}</small>`:""}</td><td>${esc(x.a)}</td><td>${x.y||"?"}</td><td>${esc(x.g||"—")}</td></tr>`).join("")};
   $("#lq").oninput=e=>{LV.q=e.target.value;fill()};$("#lg").onchange=e=>{LV.genre=e.target.value;fill()};$("#le").onchange=e=>{LV.era=e.target.value;fill()};fill()}

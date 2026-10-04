@@ -11,6 +11,9 @@ const ok = (c, m) => { console.log((c ? "PASS " : "FAIL ") + m); if (!c) fails++
 async function stub(page, opts = {}) {
   await page.route("https://itunes.apple.com/**", route => {
     const u = new URL(route.request().url()), cb = u.searchParams.get("callback");
+    // Like the real thing: iPhones and iPads get sent to the Music app instead of search results
+    if (u.pathname === "/search" && /iPhone|iPad|iPod/.test(route.request().headers()["user-agent"]))
+      return route.fulfill({ status: 301, headers: { location: "musics://mzstoreservices-st.itunes.apple.com" + u.pathname + u.search } });
     const id = u.searchParams.get("id"), term = u.searchParams.get("term") || "";
     let results = [];
     const noPreview = opts.noPreview && opts.noPreview(id, term);
@@ -20,6 +23,17 @@ async function stub(page, opts = {}) {
       else { const r = SONGS.find(x => x.a + " " + x.t === term); if (r) results = [{ trackName: r.t, artistName: r.a, previewUrl: "https://audio.test/s.wav", releaseDate: r.y + "-01-01" }]; }
     }
     route.fulfill({ contentType: "text/javascript", body: `${cb}(${JSON.stringify({ results })})` });
+  });
+  // Deezer: search answers with the song asked for (or opts.deezer), albums with opts.albumYear
+  await page.route("https://api.deezer.com/**", route => {
+    const u = new URL(route.request().url()), cb = u.searchParams.get("callback"), q = u.searchParams.get("q") || "";
+    let body = { data: [] };
+    if (u.pathname.startsWith("/album/")) body = { id: +u.pathname.split("/")[2], release_date: (opts.albumYear || 2001) + "-05-01" };
+    else if (opts.noPreview && opts.noPreview(null, q)) body = { data: [] };
+    else if (opts.deezer) body = { data: opts.deezer(q) };
+    else { const r = [...SONGS, ...(opts.extra || [])].find(x => x.a + " " + x.t === q);
+      if (r) body = { data: [{ id: 1, title: r.t, artist: { name: r.a }, album: { id: 7, title: "Album", cover_medium: "" }, preview: "https://audio.test/dz.wav", link: "", readable: true }] }; }
+    route.fulfill({ contentType: "text/javascript", body: `${cb}(${JSON.stringify(body)})` });
   });
   // Answer byte ranges like a real CDN, so the player can seek
   await page.route("https://audio.test/**", r => {
@@ -154,13 +168,13 @@ async function stub(page, opts = {}) {
 
     // ---------- No preview: quietly deal another ----------
     const p3 = await browser.newPage(); let misses = 0;
-    await stub(p3, { noPreview: () => misses++ < 3 });
+    await stub(p3, { noPreview: () => misses++ < 4 });   // a song with an ID asks 4 times: lookup, search US and UK, Deezer
     await p3.goto("http://localhost:8123/"); await p3.click("#how-ok");
     await p3.waitForSelector("#play:not([disabled])", { timeout: 15000 });
     ok(misses >= 3 && await p3.evaluate(() => round.auto >= 1), "Songs without a preview are skipped quietly");
 
     // ---------- Search accepts only the real artist's original ----------
-    const p5 = await browser.newPage(); await stub(p5, { search: () => [{ trackName: "Hello", artistName: "Karaoke Hits", previewUrl: "kar", releaseDate: "2010" }] });
+    const p5 = await browser.newPage(); await stub(p5, { search: () => [{ trackName: "Hello", artistName: "Karaoke Hits", previewUrl: "kar", releaseDate: "2010" }], deezer: () => [] });
     await p5.goto("http://localhost:8123/");
     const pick = await p5.evaluate(async () => findPreview({ k: "zz|x", t: "Hello", a: "Adele", i: 0 }));
     ok(pick === null, "Karaoke/other-artist search results are rejected");
@@ -199,6 +213,37 @@ async function stub(page, opts = {}) {
     await p6.click("#gear"); await p6.click('#flowseg [data-flow="true"]'); await p6.click("#set-ok");
     await p6.reload(); await p6.waitForSelector("#play:not([disabled])");
     ok(await p6.evaluate(() => ctx.limit === 2), "Start length remembered after reload");
+
+    // ---------- iPhone: no iTunes search there, so songs without an iTunes ID get Deezer's clip ----------
+    {
+      const extra = [{ t: "Test Song", a: "Test Singer" }];
+      const c = await browser.newContext({ ...devices["iPhone 13"], defaultBrowserType: undefined });
+      const p = await c.newPage(); const perr = []; p.on("pageerror", e => perr.push(e.message));
+      await stub(p, { extra, albumYear: 1994 });
+      await p.goto("http://localhost:8123/"); await p.click("#how-ok"); await p.waitForFunction(() => Object.keys(BUILTIN).length);
+      await p.waitForSelector("#play:not([disabled])");
+      const withId = await p.evaluate(async () => { const s = songSource().find(x => x.i); return (await findPreview(s)).url.endsWith(s.i + ".wav") });
+      ok(withId, "iPhone: songs with an iTunes ID still use the iTunes lookup");
+      await p.evaluate(x => { IMPORTS.push({ id: "ios", name: "Mine", songs: x }); CFG.on = { "b:Charts": false, "u:ios": true }; changed() }, extra);
+      await p.waitForSelector("#play:not([disabled])", { timeout: 8000 });
+      ok(await p.evaluate(() => audio.src === "https://audio.test/dz.wav" && round.target.y === 1994), "iPhone: a song without an iTunes ID plays Deezer's clip and gets its year");
+      await p.click("#play"); await p.waitForTimeout(400);
+      ok(await p.evaluate(() => audio.src.endsWith("dz.wav") && audio.currentTime > 0 && audio.paused), "iPhone: play button plays the clip");
+      ok(perr.length === 0, "iPhone: no page errors " + perr.join("; "));
+      await c.close();
+    }
+    // Deezer's results get the same checks as iTunes': the right singer, not a live/karaoke version
+    const p8 = await browser.newPage(); await stub(p8, { search: () => [], deezer: q => /Everybody/.test(q) ? [
+      { id: 4, title: "Everybody (Backstreet's Back) (Extended Version)", artist: { name: "Backstreet Boys" }, album: { id: 4, title: "X" }, preview: "ext" },
+      { id: 5, title: "Everybody (Backstreet's Back) (Radio Edit)", artist: { name: "Backstreet Boys" }, album: { id: 5, title: "Y" }, preview: "radio" }] : [
+      { id: 1, title: "Hello", artist: { name: "Karaoke Hits" }, album: { id: 1, title: "X" }, preview: "kar" },
+      { id: 2, title: "Hello (Live)", title_version: "(Live)", artist: { name: "Adele" }, album: { id: 2, title: "Live" }, preview: "live" },
+      { id: 3, title: "Hello", artist: { name: "Adele" }, album: { id: 3, title: "25" }, preview: "orig" }] });
+    await p8.goto("http://localhost:8123/");
+    const dz = await p8.evaluate(() => findPreview({ k: "hello|adele", t: "Hello", a: "Adele", i: 0, y: 2015 }));
+    ok(dz && dz.url === "orig", "When iTunes has no clip, Deezer's original is used (" + (dz && dz.url) + ")");
+    const re = await p8.evaluate(() => findPreview({ k: "everybody|bsb", t: "Everybody (Backstreet's Back)", a: "Backstreet Boys", i: 0, y: 1997 }));
+    ok(re && re.url === "radio", "A radio edit counts as the song, an extended version doesn't");
 
     // ---------- Phone and iPad ----------
     for (const [name, dev] of [["iphone", devices["iPhone 13"]], ["ipad", devices["iPad (gen 7)"]]]) {
