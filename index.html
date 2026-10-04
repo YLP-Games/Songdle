@@ -117,6 +117,9 @@ dialog .ft{display:flex;justify-content:flex-end;padding:12px 18px;border-top:1p
 .tg{flex:none;width:44px;height:26px;border-radius:13px;background:#444a5a;position:relative;transition:background .2s}
 .tg::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:left .2s}
 .tg.on{background:var(--accent)}.tg.on::after{left:21px}
+.sseg{display:flex;flex-wrap:wrap;gap:6px;background:#1c1f2a;padding:5px;border-radius:12px;border:1px solid #2c3040}
+.sseg button{flex:1;min-width:60px;min-height:46px;padding:8px 12px;border-radius:9px;border:0;background:none;color:#b9bccb;font:700 16px var(--body);cursor:pointer}
+.sseg button[aria-checked="true"]{background:var(--accent);color:var(--on-accent)}
 .srow{display:flex;gap:8px;align-items:stretch}.srow .sopt{flex:1}
 .snote{font-size:14px;color:#9a9db0}
 .imp input[type=text]{width:100%;background:#1a1d27;border:1px solid #2c3040;border-radius:10px;padding:11px 12px;color:#e9e9ee;font:16px var(--body);margin:4px 0 10px}
@@ -151,7 +154,10 @@ dialog .ft{display:flex;justify-content:flex-end;padding:12px 18px;border-top:1p
 </dialog>
 
 <dialog id="settings"><div class="hd"><h2>Settings</h2><button class="sx" id="set-x" aria-label="Close">✕</button></div><div class="bd">
- <h3>Song lists</h3>
+ <h3>First clip length</h3>
+ <div class="sseg" id="startseg" role="radiogroup" aria-label="First clip length"></div>
+ <p class="snote" id="startnote"></p>
+ <h3 style="margin-top:18px">Song lists</h3>
  <div id="lists"></div>
  <h3 style="margin-top:18px">Add your own playlist</h3>
  <div class="imp">
@@ -171,11 +177,13 @@ const load=(k,d)=>{try{const v=localStorage.getItem(k);return v==null?d:JSON.par
 const save=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
 
 /* ---------- Song lists ---------- */
-const CLIPS=[0.1,0.5,2,8,15];
+// How long the first clip is (Settings); each skip or wrong guess moves to the next length
+const LADDERS={"0.1":[0.1,0.5,2,8,15],"0.5":[0.5,1,3,8,15],"1":[1,2,4,8,15],"2":[2,4,7,11,15],"5":[5,8,11,15,20]};
+let CLIPS=LADDERS["0.1"];
 const ERAS=[["All",0,9999],["Classic (before 2000)",0,1999],["2000s",2000,2009],["2010s",2010,2019],["2020s",2020,9999]];
 let BUILTIN={};                              // playlists.json: {"Charts":[{t,a,y,g,i,c}], ...}
 let IMPORTS=load("sd_imports",[]);           // [{id,name,songs}]
-const CFG=Object.assign({on:{},genre:"All",era:"All"},load("sd_cfg",{}));
+const CFG=Object.assign({on:{},genre:"All",era:"All",start:"0.1"},load("sd_cfg",{}));if(!LADDERS[CFG.start])CFG.start="0.1";CLIPS=LADDERS[CFG.start];
 let YEARFIX=load("sd_years",{});
 
 function allLists(){return[...Object.keys(BUILTIN).map(n=>({id:"b:"+n,name:n,songs:BUILTIN[n],builtin:true})),...IMPORTS.map(x=>({id:"u:"+x.id,name:x.name,songs:x.songs}))]}
@@ -251,7 +259,7 @@ function dailyFinish(st){const d=st.date;if(DSTATS.last===d)return;const y=new D
   if(st.won){DSTATS.w++;DSTATS.streak=DSTATS.lastWin===yd?DSTATS.streak+1:1;DSTATS.best=Math.max(DSTATS.best,DSTATS.streak);DSTATS.lastWin=d}else DSTATS.streak=0;
   DSTATS.last=d;save("sd_dstats",DSTATS)}
 function shareText(st,t){const sq=st.guesses.map(g=>g.skip?"⬛":g.k===t.k?"🟩":artistMatch(g,t)!=="miss"?"🟧":"🟥").join("");
-  return`Songdle ${st.date}\n${sq}${"⬜".repeat(Math.max(0,CLIPS.length-st.guesses.length))}\n${st.won?"Got it in "+st.guesses.length+"/5":"Didn't get it"}`}
+  return`Songdle ${st.date}${CLIPS[0]!==0.1?" (from "+CLIPS[0]+"s)":""}\n${sq}${"⬜".repeat(Math.max(0,CLIPS.length-st.guesses.length))}\n${st.won?"Got it in "+st.guesses.length+"/5":"Didn't get it"}`}
 
 /* ---------- Audio (scrubber from Yahyadle's Songdle) ---------- */
 let audio=null,timer=null,raf=0,ctx=null;
@@ -425,7 +433,10 @@ function parseCSV(text){
   return rows.slice(1).filter(r=>r[ti]&&r[ai]).map(r=>({t:r[ti].trim(),a:joinArtists(r[ai]),y:yi>=0?parseInt(r[yi])||0:0,g:gi>=0&&r[gi]?r[gi].split(/[;,]/)[0].trim().replace(/\b\w/g,m=>m.toUpperCase()):""}));
 }
 function changed(){ensureOneOn();save("sd_cfg",CFG);srcCache=null;round=null;nextSong=null;renderSettings();render()}
-function renderSettings(){ensureOneOn();const L=allLists(),onCount=L.filter(l=>listOn(l.id)).length;
+function renderSettings(){ensureOneOn();
+  $("#startseg").innerHTML=Object.keys(LADDERS).map(k=>`<button role="radio" aria-checked="${CFG.start===k}" data-start="${k}">${k}s</button>`).join("");
+  $("#startnote").textContent="Clips go: "+CLIPS.map(c=>c+"s").join(" → ");
+  $("#startseg").querySelectorAll("button").forEach(b=>b.onclick=()=>{CFG.start=b.dataset.start;CLIPS=LADDERS[CFG.start];changed()});const L=allLists(),onCount=L.filter(l=>listOn(l.id)).length;
   $("#lists").innerHTML=L.map(l=>{const on=listOn(l.id),lock=on&&onCount===1;return`<div class="srow"><button class="sopt" role="switch" aria-checked="${on}" data-id="${esc(l.id)}"${lock?" disabled":""}>
     <span><b>${esc(l.name)}</b><small>${l.songs.length} songs${l.builtin?"":" · on this device"}${lock?" · at least one list stays on":""}</small></span><span class="tg${on?" on":""}"></span></button>${l.builtin?"":`<button class="btn" data-del="${esc(l.id)}">Remove</button>`}</div>`}).join("");
   $("#lists").querySelectorAll(".sopt").forEach(c=>c.onclick=()=>{CFG.on[c.dataset.id]=!listOn(c.dataset.id);changed()});

@@ -173,6 +173,18 @@ async function stub(page, opts = {}) {
     const pr = await p4.evaluate(() => findPreview({ k: "hello|adele", t: "Hello", a: "Adele", i: 0 }));
     ok(pr && pr.url === "orig" && pr.year === 2015, "Search picks the earliest original recording");
 
+    // ---------- First clip length setting ----------
+    const p6 = await browser.newPage(); await stub(p6); await p6.goto("http://localhost:8123/"); await p6.click("#how-ok");
+    await p6.waitForSelector("#play:not([disabled])");
+    await p6.click("#gear"); await p6.click('#startseg [data-start="2"]');
+    ok((await p6.textContent("#startnote")).includes("2s → 4s"), "Settings shows the clip lengths for a 2s start");
+    await p6.click("#set-ok"); await p6.waitForSelector("#play:not([disabled])");
+    ok(await p6.evaluate(() => ctx.limit === 2), "Game starts with a 2s clip");
+    await p6.click("#skip");
+    ok(await p6.evaluate(() => ctx.limit === 4) && (await p6.textContent("#skip")).includes("+7s"), "Skip moves to 4s, next 7s");
+    await p6.reload(); await p6.waitForSelector("#play:not([disabled])");
+    ok(await p6.evaluate(() => ctx.limit === 2), "Start length remembered after reload");
+
     // ---------- Phone and iPad ----------
     for (const [name, dev] of [["iphone", devices["iPhone 13"]], ["ipad", devices["iPad (gen 7)"]]]) {
       const c = await browser.newContext({ ...dev, defaultBrowserType: undefined });
