@@ -524,12 +524,13 @@ function renderGame(st){
     // Play only once the whole clip is ready, so it never stops to buffer (the song already playing on a Skip stays)
     return(audio&&audio.src===p.url?Promise.resolve(audio):player(p.url)).then(pl=>{if(pb!==$("#play"))return;
     if(audio&&audio!==pl)audio.pause();audio=pl;audio.preload="auto";audio.volume=vol;pb.disabled=false;
-    const going=carry&&!st.done&&!audio.paused;carry=false;
+    const going=carry&&!audio.paused;carry=false;
     status.textContent=(st.done?"Full preview":"Clip: "+len+"s")+(going?" · playing":" · press play");if(going)keepPlaying();
     audio.onloadedmetadata=()=>{if(st.done&&ctx&&ctx.st===st&&isFinite(audio.duration)){ctx.limit=ctx.total=audio.duration;draw()}};if(audio.readyState>=1)audio.onloadedmetadata();
     if(!st.done&&!daily)(audio.readyState>=3?setTimeout(prefetch,300):audio.addEventListener("canplaythrough",prefetch,{once:true}));
     if(st.done){const a=$("#art");if(a&&p.art){a.src=p.art;a.hidden=false}const lk=$("#lk-am");if(lk&&p.link)lk.href=p.link;
-      if(st.won&&!st.autoplayed){st.autoplayed=true;if(daily)saveDaily(st);status.textContent="Full preview · playing";st.pos=0;play()}}})
+      // A win plays on from where the clip got to (still playing, or where it was paused), into the full preview
+      if(st.won&&!st.autoplayed){st.autoplayed=true;if(daily)saveDaily(st);if(!going){status.textContent="Full preview · playing";play()}}}})
   }).catch(e=>{console.error(e);if(!$("#play")||pb!==$("#play"))return;
     // Before any guesses, quietly try another song; after that, offer a retry
     if(!daily&&st===round&&!st.done&&!st.guesses.length&&(st.auto||0)<4){const n=newRound();n.auto=(st.auto||0)+1;round=n;render();return}
@@ -562,7 +563,10 @@ function renderGame(st){
   // Guess from every switched-on song (always including the answer)
   const pool=songSource().slice();if(!pool.some(x=>x.k===t.k))pool.push(t);
   const used=new Set(st.guesses.map(g=>g.k));
-  wireSearch(pool.filter(x=>!used.has(x.k)),g=>{st.guesses.push({k:g.k,t:g.t,a:g.a,y:g.y});if(g.k===t.k)finish(true);after();
+  wireSearch(pool.filter(x=>!used.has(x.k)),g=>{
+    // Right answer: keep the music going from where it is (or resume from where it was paused) instead of starting over
+    if(g.k===t.k){const playing=!!(audio&&!audio.paused);st.pos=playing?audio.currentTime:(st.pos||0);st.keepPos=true;carry=playing;if(playing&&audio.until)audio.until(Infinity)}
+    st.guesses.push({k:g.k,t:g.t,a:g.a,y:g.y});if(g.k===t.k)finish(true);after();
     if(!g.i)findPreview(g).then(info=>{if(applyYear(g,info)){const s=st.guesses.find(x=>x.k===g.k);if(s)s.y=g.y;if(daily)saveDaily(st);render()}}).catch(()=>{})});
 }
 function saveDaily(st){const {target,fresh,...rest}=st;save("sd_daily",rest)}

@@ -213,6 +213,32 @@ async function stub(page, opts = {}) {
       ok(got.includes(want), `Typing "${q}" suggests ${want}`);
     }
 
+    // ---------- A right guess plays on instead of starting over ----------
+    {const p9 = await browser.newPage(); await stub(p9); await p9.goto("http://localhost:8123/"); await p9.click("#how-ok");
+    await p9.waitForSelector("#play:not([disabled])");
+    await p9.click("#skip"); await p9.click("#skip"); await p9.waitForSelector("#play:not([disabled])");   // 2s clip
+    await p9.click("#play"); await p9.waitForTimeout(700);
+    const tg = await p9.evaluate(() => round.target);
+    const before = await p9.evaluate(() => audio.currentTime);
+    await p9.fill("#guess", tg.t); await p9.waitForSelector("#sugg li[data-i]");
+    const wi = await p9.$$eval("#sugg li[data-i]", (ls, w) => ls.findIndex(l => l.textContent === w.t + w.a), tg);
+    await p9.click(`#sugg li[data-i="${wi}"]`); await p9.waitForSelector(".win"); await p9.waitForTimeout(400);
+    const aft = await p9.evaluate(() => ({ p: !audio.paused, t: audio.currentTime, lim: ctx.limit }));
+    ok(aft.p && aft.t > before && aft.t > 0.9 && aft.lim > 2, "Right guess while playing carries on from the same spot " + JSON.stringify({ before, ...aft }));
+    await p9.waitForTimeout(1600);
+    ok(await p9.evaluate(() => !audio.paused && audio.currentTime > 2.2), "…and plays past the clip into the full preview");
+    // Paused partway: a right guess resumes from there
+    await p9.click("#next"); await p9.waitForSelector("#play:not([disabled])");
+    await p9.click("#skip"); await p9.click("#skip"); await p9.waitForSelector("#play:not([disabled])");
+    await p9.click("#play"); await p9.waitForTimeout(900); await p9.click("#play");
+    const at = await p9.evaluate(() => round.pos), tg2 = await p9.evaluate(() => round.target);
+    await p9.fill("#guess", tg2.t); await p9.waitForSelector("#sugg li[data-i]");
+    const wj = await p9.$$eval("#sugg li[data-i]", (ls, w) => ls.findIndex(l => l.textContent === w.t + w.a), tg2);
+    await p9.click(`#sugg li[data-i="${wj}"]`); await p9.waitForSelector(".win"); await p9.waitForTimeout(500);
+    const res = await p9.evaluate(() => ({ p: !audio.paused, t: audio.currentTime }));
+    ok(at > 0.5 && res.p && res.t >= at, "Right guess while paused resumes from where it stopped " + JSON.stringify({ at, ...res }));
+    await p9.close()}
+
     // ---------- First clip length setting ----------
     const p6 = await browser.newPage(); await stub(p6); await p6.goto("http://localhost:8123/"); await p6.click("#how-ok");
     await p6.waitForSelector("#play:not([disabled])");
