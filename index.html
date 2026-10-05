@@ -288,11 +288,15 @@ const songKey=(t,a)=>{const k=x=>x.replace(/[^\p{L}\p{N}]+/gu," ").trim();
     .replace(/\s+-\s+.*\b(remaster(ed)?|radio edit|single version|album version|explicit)\b.*$/,"").replace(/\s+(feat|ft)\.?\s.*$/,"");
   return k(title)+"|"+mainArtist(a)};
 
+// Artists left out altogether, including songs they're featured on, even in added playlists.
+// Compared as artistSet() credits, so "P!nk" is "p nk"; Pink Floyd, Blackpink and PinkPantheress are unaffected.
+const BLOCKED=new Set(["ed sheeran","pink","p nk"]);
+const blocked=r=>[...artistSet(r.a,r.t)].some(x=>BLOCKED.has(x));
 let srcCache=null;
 function songSource(){
   const sig=JSON.stringify(CFG.on)+IMPORTS.length+Object.keys(BUILTIN).length;if(srcCache&&srcCache.sig===sig)return srcCache.out;
   const m=new Map();
-  for(const L of allLists()){if(!listOn(L.id))continue;for(const r of L.songs){const k=songKey(r.t,r.a),o=m.get(k);
+  for(const L of allLists()){if(!listOn(L.id))continue;for(const r of L.songs){if(blocked(r))continue;const k=songKey(r.t,r.a),o=m.get(k);
     if(!o){const f=YEARFIX[k];let y=+r.y||0;if(f&&(!y||f<y))y=f;m.set(k,{k,t:r.t,a:r.a,y,g:r.g||"",i:r.i||0,c:r.c||"",lists:[L.name]});continue}
     if(!o.i&&r.i){o.i=r.i;o.c=r.c||""}if(!o.lists.includes(L.name))o.lists.push(L.name);if(+r.y&&(!o.y||+r.y<o.y))o.y=+r.y;if(!o.g&&r.g)o.g=r.g}}
   const out=[...m.values()];srcCache={sig,out};return out}
@@ -362,7 +366,7 @@ const DSTATS=Object.assign({w:0,streak:0,best:0,last:""},load("sd_dstats",{}));
 const today=()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")};
 function hash(s){let h=2166136261;for(const c of s){h^=c.charCodeAt(0);h=Math.imul(h,16777619)}return h>>>0}
 // Same song for everyone: picked from the Charts list (songs with a saved iTunes ID), whatever lists are switched on
-function dailySong(date){const C=(BUILTIN.Charts||[]).filter(r=>r.i);if(!C.length)return null;const r=C[hash("songdle"+date)%C.length];
+function dailySong(date){const C=(BUILTIN.Charts||[]).filter(r=>r.i&&!blocked(r));if(!C.length)return null;const r=C[hash("songdle"+date)%C.length];
   const k=songKey(r.t,r.a);return{k,t:r.t,a:r.a,y:+r.y||0,g:r.g||"",i:r.i,c:r.c||"",lists:["Charts"]}}
 function dailyState(){const d=today(),s=load("sd_daily",null);if(s&&s.date===d)return s;return{date:d,guesses:[],done:false,won:false,daily:true}}
 function dailyFinish(st){const d=st.date;if(DSTATS.last===d)return;const y=new Date(d);y.setDate(y.getDate()-1);
